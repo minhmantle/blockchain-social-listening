@@ -105,7 +105,6 @@ NARRATIVE_COLORS = {
 CHART_LAYOUT = dict(
     paper_bgcolor="#0d0d1a", plot_bgcolor="#0d0d1a",
     font=dict(color="#888", size=11, family="Inter"),
-    margin=dict(l=10, r=10, t=30, b=10),
     xaxis=dict(gridcolor="#1e1e3a", showgrid=True, zeroline=False),
     yaxis=dict(gridcolor="#1e1e3a", showgrid=True, zeroline=False),
     legend=dict(bgcolor="rgba(0,0,0,0)", font_size=11),
@@ -219,12 +218,17 @@ def group_by(tweets, period):
         if period == "Day":    key = dt.date()
         elif period == "Week": key = dt.date() - timedelta(days=dt.weekday())
         else:                  key = dt.date().replace(day=1)
-        rows.append({"period": key, "likes": m.get("like_count",0) or 0,
-                     "retweets": m.get("retweet_count",0) or 0,
-                     "replies": m.get("reply_count",0) or 0,
-                     "eng_val": eng(m)})
+        imp = m.get("impression_count") or 0
+        if imp == 0:
+            imp = eng(m) * 40
+        rows.append({"period": key,
+                     "likes":       m.get("like_count",0) or 0,
+                     "retweets":    m.get("retweet_count",0) or 0,
+                     "replies":     m.get("reply_count",0) or 0,
+                     "eng_val":     eng(m),
+                     "impressions": imp})
     if not rows:
-        return pd.DataFrame(columns=["period","likes","retweets","replies","eng_val"])
+        return pd.DataFrame(columns=["period","likes","retweets","replies","eng_val","impressions"])
     return pd.DataFrame(rows).groupby("period").sum().reset_index().sort_values("period")
 
 def date_controls(pfx):
@@ -376,11 +380,25 @@ def tab_mantle(token):
     df = group_by(tweets, period)
     if not df.empty:
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=df["period"], y=df["likes"],    name="Likes",    marker_color=color, opacity=0.4))
-        fig.add_trace(go.Bar(x=df["period"], y=df["retweets"], name="Retweets", marker_color=color, opacity=0.7))
-        fig.add_trace(go.Bar(x=df["period"], y=df["replies"],  name="Replies",  marker_color=color))
-        fig.update_layout(**CHART_LAYOUT, barmode="stack", height=260,
-                          title=dict(text=f"Engagement by {period} — @{handle}", font_size=12, x=0))
+        fig.add_trace(go.Bar(
+            x=df["period"], y=df["impressions"],
+            name="Impressions", marker_color=color, opacity=0.85,
+            hovertemplate="%{x}: %{y:,}<extra>Impressions</extra>"
+        ))
+        fig.add_trace(go.Scatter(
+            x=df["period"], y=df["eng_val"],
+            name="Engagement score", mode="lines+markers",
+            line=dict(color="#f59e0b", width=2), marker=dict(size=5),
+            yaxis="y2", hovertemplate="%{x}: %{y:,}<extra>Engagement</extra>"
+        ))
+        fig.update_layout(**CHART_LAYOUT,
+            barmode="group", height=280,
+            margin=dict(l=10, r=10, t=30, b=10),
+            yaxis=dict(title="Impressions", gridcolor="#1e1e3a"),
+            yaxis2=dict(title="Engagement", overlaying="y", side="right",
+                        gridcolor="rgba(0,0,0,0)", showgrid=False),
+            title=dict(text=f"Impressions & Engagement by {period} — @{handle}", font_size=12, x=0)
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     all_nar = []
@@ -401,7 +419,8 @@ def tab_mantle(token):
                 textfont_size=11, hole=0.55,
                 hovertemplate="%{label}: %{value} posts<extra></extra>"
             ))
-            fig_pie.update_layout(**CHART_LAYOUT, height=220, showlegend=False,
+            pie_layout = {k:v for k,v in CHART_LAYOUT.items() if k != "margin"}
+            fig_pie.update_layout(**pie_layout, height=220, showlegend=False,
                                    margin=dict(l=0,r=0,t=10,b=0))
             st.plotly_chart(fig_pie, use_container_width=True)
         with nc2:
@@ -486,14 +505,17 @@ def tab_competitive(token):
         df = group_by(d["tweets"], period)
         if not df.empty:
             fig.add_trace(go.Scatter(
-                x=df["period"], y=df["eng_val"], name=name,
+                x=df["period"], y=df["impressions"], name=name,
                 mode="lines+markers",
                 line=dict(color=d["info"]["color"], width=2),
                 marker=dict(size=5),
                 hovertemplate=f"{name}: %{{y:,}}<extra></extra>"
             ))
-    fig.update_layout(**CHART_LAYOUT, height=280,
-                      title=dict(text=f"Engagement by {period} — all chains", font_size=12, x=0))
+    fig.update_layout(**CHART_LAYOUT,
+        height=280,
+        margin=dict(l=10, r=10, t=30, b=10),
+        title=dict(text=f"Impressions by {period} — all chains", font_size=12, x=0)
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown('<div class="section-title">Top 3 official posts by engagement</div>',
