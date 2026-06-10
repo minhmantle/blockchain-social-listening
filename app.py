@@ -596,6 +596,137 @@ def tab_research(token):
     for i,t in enumerate(sorted_posts[:15],1):
         render_post(t,i,"#A0C8B0",is_user=True)
 
+# ── TAB 4: MARKET NARRATIVE ──────────────────────────────────────────────────
+# Queries per narrative — count tweets in last 7 days
+NARRATIVE_QUERIES = {
+    "DeFi":           "(defi OR dex OR yield OR liquidity OR lending OR amm) (crypto OR blockchain) -is:retweet lang:en",
+    "RWA":            "(rwa OR \"real world asset\" OR tokenized OR tokenization OR \"treasury token\") (crypto OR blockchain) -is:retweet lang:en",
+    "AI x Crypto":    "(ai OR \"artificial intelligence\" OR llm OR \"ai agent\") (crypto OR blockchain OR web3 OR defi) -is:retweet lang:en",
+    "Infrastructure": "(layer2 OR l2 OR rollup OR \"base layer\" OR validator OR restaking) (crypto OR blockchain) -is:retweet lang:en",
+    "NFT":            "(nft OR \"digital collectible\" OR mint OR pfp) (crypto OR blockchain) -is:retweet lang:en",
+    "Gaming":         "(gamefi OR \"play to earn\" OR p2e OR \"onchain game\" OR gaming) (crypto OR blockchain) -is:retweet lang:en",
+    "Institutional":  "(institutional OR etf OR blackrock OR fidelity OR \"hedge fund\" OR \"asset manager\") (crypto OR bitcoin OR ethereum) -is:retweet lang:en",
+    "Stablecoin":     "(stablecoin OR usdt OR usdc OR \"stable coin\" OR depeg) (crypto OR blockchain) -is:retweet lang:en",
+    "Meme":           "(memecoin OR meme OR \"dog coin\" OR shitcoin OR pump) (crypto OR blockchain) -is:retweet lang:en",
+}
+
+@st.cache_data(ttl=600)
+def count_narrative_tweets(query, token, start_iso, end_iso):
+    """Use search/recent with max_results=10 just to get meta.result_count"""
+    params={
+        "query": query,
+        "max_results": 10,
+        "start_time": start_iso,
+        "end_time": end_iso,
+        "tweet.fields": "public_metrics,created_at,text",
+        "expansions": "author_id",
+        "user.fields": "username,name,public_metrics",
+    }
+    r=requests.get("https://api.twitter.com/2/tweets/search/recent",
+                   headers=hdrs(token),params=params)
+    if r.status_code!=200: return 0, []
+    data=r.json()
+    # get sample tweets for top posts section
+    tweets=data.get("data",[]) or []
+    users={u["id"]:u for u in data.get("includes",{}).get("users",[])}
+    for t in tweets:
+        u=users.get(t.get("author_id"),{})
+        t["author_handle"]=u.get("username","unknown")
+        t["author_name"]=u.get("name","Unknown")
+        t["author_followers"]=u.get("public_metrics",{}).get("followers_count",0)
+    # result_count is more accurate than len(tweets)
+    count=data.get("meta",{}).get("result_count",len(tweets))
+    return count, tweets
+
+def tab_market(token):
+    st.markdown('<div class="tab-title">Market Narrative Trends — Last 7 Days</div>',unsafe_allow_html=True)
+    st.markdown('<div class="search-note">⚡ Based on X Search API — limited to last 7 days · ~9 API calls per load</div>',unsafe_allow_html=True)
+
+    si,ei=search_iso()
+
+    # Fetch counts for all narratives
+    st.markdown('<div class="section-title">Narrative Volume — Tweet Count</div>',unsafe_allow_html=True)
+
+    counts={}
+    sample_tweets={}
+    progress=st.progress(0,text="Fetching narrative data…")
+    for i,(name,q) in enumerate(NARRATIVE_QUERIES.items()):
+        progress.progress((i+1)/len(NARRATIVE_QUERIES),text=f"Fetching {name}…")
+        c,tw=count_narrative_tweets(q,token,si,ei)
+        counts[name]=c
+        sample_tweets[name]=tw
+    progress.empty()
+
+    if not any(counts.values()):
+        st.warning("No data returned. Check API token or try again later.")
+        return
+
+    # Sort by count
+    sorted_counts=sorted(counts.items(),key=lambda x:-x[1])
+    total=sum(v for _,v in sorted_counts) or 1
+
+    # Bar chart — tweet volume
+    fig=go.Figure(go.Bar(
+        x=[n for n,_ in sorted_counts],
+        y=[c for _,c in sorted_counts],
+        marker_color=[NARRATIVE_COLORS.get(n,"#6b7280") for n,_ in sorted_counts],
+        text=[f"{c:,}" for _,c in sorted_counts],
+        textposition="outside",
+        hovertemplate="%{x}: %{y:,} tweets<extra></extra>",
+    ))
+    fig.update_layout(**BASE_LAYOUT,height=300,showlegend=False,
+                      xaxis=AXIS,yaxis=AXIS,
+                      title=dict(text="Tweet volume by narrative — last 7 days",
+                                 font=dict(size=13,color="#E0F5EC"),x=0))
+    st.plotly_chart(fig,use_container_width=True)
+
+    # Pie chart — % share
+    c1,c2=st.columns([1,1])
+    with c1:
+        st.markdown('<div class="section-title">Narrative Share %</div>',unsafe_allow_html=True)
+        fp=go.Figure(go.Pie(
+            labels=[n for n,_ in sorted_counts],
+            values=[c for _,c in sorted_counts],
+            marker=dict(colors=[NARRATIVE_COLORS.get(n,"#6b7280") for n,_ in sorted_counts],
+                        line=dict(color=MANTLE_DARK,width=2)),
+            textfont_size=11,hole=0.5,
+            hovertemplate="%{label}: %{value:,} tweets (%{percent})<extra></extra>"))
+        pl={k:v for k,v in BASE_LAYOUT.items() if k!="margin"}
+        fp.update_layout(**pl,height=300,showlegend=True,margin=dict(l=0,r=0,t=10,b=0))
+        st.plotly_chart(fp,use_container_width=True)
+
+    with c2:
+        st.markdown('<div class="section-title">Ranking</div>',unsafe_allow_html=True)
+        for rank,(name,cnt) in enumerate(sorted_counts,1):
+            c=NARRATIVE_COLORS.get(name,"#666")
+            pct=cnt/total*100
+            st.markdown(f"""
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+              <div style="font-size:14px;font-weight:800;color:#555;min-width:20px">#{rank}</div>
+              <div style="width:10px;height:10px;border-radius:2px;background:{c};flex-shrink:0"></div>
+              <div style="flex:1;font-size:13px;color:{MANTLE_TEXT};font-weight:600">{name}</div>
+              <div style="font-size:12px;color:{MANTLE_MUTED}">{cnt:,} tweets</div>
+              <div style="width:80px;background:{MANTLE_BORDER};border-radius:4px;height:6px">
+                <div style="width:{pct}%;background:{c};border-radius:4px;height:6px"></div>
+              </div>
+              <div style="font-size:12px;color:{c};font-weight:700;min-width:36px">{pct:.1f}%</div>
+            </div>""",unsafe_allow_html=True)
+
+    # Sample top posts per top 3 narratives
+    st.markdown('<div class="section-title">Sample Posts — Top 3 Narratives</div>',unsafe_allow_html=True)
+    top3=[n for n,_ in sorted_counts[:3]]
+    cols=st.columns(3)
+    for col,name in zip(cols,top3):
+        c=NARRATIVE_COLORS.get(name,"#6b7280")
+        tw=sorted(sample_tweets.get(name,[]),key=get_imp,reverse=True)
+        with col:
+            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{c};margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">{name}</div>',unsafe_allow_html=True)
+            if tw:
+                for i,t in enumerate(tw[:3],1):
+                    render_post(t,i,c,is_user=True)
+            else:
+                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No sample posts</div>',unsafe_allow_html=True)
+
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
     token=get_token()
@@ -623,10 +754,11 @@ def main():
             st.cache_data.clear()
             st.rerun()
 
-    t1,t2,t3=st.tabs(["📊  Mantle Deep Dive","⚔️  Competitive Analysis","🔬  Industry Research"])
+    t1,t2,t3,t4=st.tabs(["📊  Mantle Deep Dive","⚔️  Competitive Analysis","🔬  Industry Research","🌐  Market Narratives"])
     with t1: tab_mantle(token)
     with t2: tab_competitive(token)
     with t3: tab_research(token)
+    with t4: tab_market(token)
 
 if __name__=="__main__":
     main()
