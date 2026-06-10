@@ -276,35 +276,62 @@ def render_post(t,rank,color,chain_name=None,is_user=False):
     </div>""",unsafe_allow_html=True)
 
 def kw_bar(key_input, key_btn, key_clear, placeholder):
-    """Keyword search bar — returns (kw, active)"""
-    c1,c2,c3=st.columns([4,1,1])
+    """Keyword search bar — compact inline layout, no clear button"""
+    c1,c2=st.columns([5,1])
     with c1:
         kw=st.text_input("Keyword",placeholder=placeholder,key=key_input,label_visibility="collapsed")
     with c2:
         search=st.button("Search",key=key_btn,use_container_width=True)
-    with c3:
-        clear=st.button("Clear",key=key_clear,use_container_width=True)
-    # persist active keyword in session state
     sk=f"{key_input}_active"
     if search and kw:
         st.session_state[sk]=kw
-    if clear:
+    if search and not kw:
         st.session_state[sk]=""
     active=st.session_state.get(sk,"")
     if active:
-        st.markdown(f'<div class="kw-active">🔍 Filtering by: <b>{active}</b> — metrics & posts below reflect this keyword only</div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="kw-active">🔍 Filtering: <b>{active}</b></div>',unsafe_allow_html=True)
+    return active
+
+def kw_date_row(kw_key_input, kw_key_btn, kw_key_clear, kw_placeholder, date_pfx):
+    """Keyword + date controls in one compact row"""
+    st.markdown('<div class="section-title">Filter & Date Range</div>',unsafe_allow_html=True)
+    c1,c2,c3,c4,c5=st.columns([3,1,2,2,1])
+    with c1:
+        kw=st.text_input("kw",placeholder=kw_placeholder,key=kw_key_input,label_visibility="collapsed")
+    with c2:
+        search=st.button("Search",key=kw_key_btn,use_container_width=True)
+    sk=f"{kw_key_input}_active"
+    if search and kw:
+        st.session_state[sk]=kw
+    if search and not kw:
+        st.session_state[sk]=""
+    active=st.session_state.get(sk,"")
+
+    # date controls inline
+    if f"{date_pfx}_sv" not in st.session_state:
+        st.session_state[f"{date_pfx}_sv"]=date.today()-timedelta(days=7)
+    if f"{date_pfx}_ev" not in st.session_state:
+        st.session_state[f"{date_pfx}_ev"]=date.today()
+    with c3:
+        start=st.date_input("From",value=st.session_state[f"{date_pfx}_sv"],max_value=date.today(),key=f"{date_pfx}_s")
+        st.session_state[f"{date_pfx}_sv"]=start
+    with c4:
+        end=st.date_input("To",value=st.session_state[f"{date_pfx}_ev"],max_value=date.today(),key=f"{date_pfx}_e")
+        st.session_state[f"{date_pfx}_ev"]=end
+    with c5:
+        period=st.selectbox("Group",["Day","Week","Month"],key=f"{date_pfx}_p",label_visibility="collapsed")
+
+    if active:
+        st.markdown(f'<div class="kw-active">🔍 Filtering: <b>{active}</b></div>',unsafe_allow_html=True)
     else:
         st.markdown('<div class="search-note">💡 Enter a keyword to filter the entire dashboard</div>',unsafe_allow_html=True)
-    return active
+    return active, start, end, period
 
 # ── TAB 1 ────────────────────────────────────────────────────────────────────
 def tab_mantle(token):
     st.markdown('<div class="tab-title">Mantle — Performance Deep Dive</div>',unsafe_allow_html=True)
-    st.markdown('<div class="section-title">🔍 Keyword Filter</div>',unsafe_allow_html=True)
-    kw=kw_bar("t1_kw","t1_kw_btn","t1_kw_clr","Filter by keyword — e.g. RWA, mETH, DeFi, hackathon…")
-
-    st.markdown('<div class="section-title">Performance Overview</div>',unsafe_allow_html=True)
-    start,end,period=date_controls("t1")
+    kw,start,end,period=kw_date_row("t1_kw","t1_kw_btn","t1_kw_clr",
+        "Filter by keyword — e.g. RWA, mETH, DeFi…","t1")
     start_iso,end_iso=iso_range(start,end)
     days=(end-start).days+1
     prev_s_iso,prev_e_iso=iso_range(start-timedelta(days=days),start-timedelta(days=1))
@@ -404,10 +431,8 @@ def tab_mantle(token):
 # ── TAB 2 ────────────────────────────────────────────────────────────────────
 def tab_competitive(token):
     st.markdown('<div class="tab-title">Competitive Analysis — Mantle vs Solana vs Base</div>',unsafe_allow_html=True)
-    st.markdown('<div class="section-title">🔍 Keyword Filter</div>',unsafe_allow_html=True)
-    kw=kw_bar("t2_kw","t2_kw_btn","t2_kw_clr","Filter all chains by keyword — e.g. RWA, institutional, airdrop…")
-
-    start,end,period=date_controls("t2")
+    kw,start,end,period=kw_date_row("t2_kw","t2_kw_btn","t2_kw_clr",
+        "Filter all chains by keyword — e.g. RWA, institutional…","t2")
     start_iso,end_iso=iso_range(start,end)
     days=(end-start).days+1
     prev_s_iso,prev_e_iso=iso_range(start-timedelta(days=days),start-timedelta(days=1))
@@ -533,10 +558,8 @@ RESEARCH_ACCOUNTS = [
 # ── TAB 3 ────────────────────────────────────────────────────────────────────
 def tab_research(token):
     st.markdown('<div class="tab-title">Industry Research — Notable Reads</div>',unsafe_allow_html=True)
-    st.markdown('<div class="section-title">🔍 Keyword Filter</div>',unsafe_allow_html=True)
-    kw=kw_bar("t3_kw","t3_kw_btn","t3_kw_clr","Filter research by topic — e.g. RWA, L2, DeFi, Mantle…")
-
-    start,end,period=date_controls("t3")
+    kw,start,end,period=kw_date_row("t3_kw","t3_kw_btn","t3_kw_clr",
+        "Filter by topic — e.g. RWA, L2, DeFi, Mantle…","t3")
     start_iso,end_iso=iso_range(start,end)
 
     # Fetch from all research accounts
