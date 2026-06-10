@@ -53,11 +53,14 @@ section[data-testid="stSidebar"]{{display:none;}}
 .header-bar{{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid {MANTLE_BORDER};}}
 .live-pill{{background:#0A2E14;color:{MANTLE_GREEN};border:1px solid #1A5E2A;padding:4px 12px;border-radius:99px;font-size:11px;font-weight:600;}}
 .search-note{{font-size:11px;color:{MANTLE_MUTED};background:{MANTLE_SURFACE};border:1px solid {MANTLE_BORDER};border-radius:6px;padding:6px 12px;margin-bottom:6px;}}
-.kw-active{{font-size:11px;color:{MANTLE_GREEN};background:#0A2E14;border:1px solid #1A5E2A;border-radius:6px;padding:6px 12px;margin-bottom:6px;font-weight:600;}}
+.tab-desc{{background:#0A1F10;border:1px solid {MANTLE_BORDER};border-radius:10px;padding:14px 18px;margin-bottom:16px;}}
+.tab-desc-title{{font-size:13px;font-weight:700;color:{MANTLE_GREEN};margin-bottom:6px;}}
+.tab-desc-body{{font-size:12px;color:{MANTLE_MUTED};line-height:1.6;}}
+.tab-desc-body b{{color:{MANTLE_TEXT};}}
 </style>
 """, unsafe_allow_html=True)
 
-NARRATIVES = {
+NARRATIVES = {{
     "DeFi":          ["defi","dex","liquidity","yield","swap","lending","amm","tvl","staking"],
     "RWA":           ["rwa","real world asset","tokenized","tokenization","treasury","bond","t-bill"],
     "AI":            ["ai","artificial intelligence","machine learning","llm","agent","gpt"],
@@ -66,13 +69,13 @@ NARRATIVES = {
     "Gaming":        ["gaming","gamefi","game","play to earn","p2e","metaverse"],
     "Institutional": ["institution","institutional","blackrock","fidelity","bank","fund","etf",
                       "investment","hedge fund","enterprise","corporate","adoption"],
-}
+}}
 
-NARRATIVE_COLORS = {
+NARRATIVE_COLORS = {{
     "DeFi":"#3b82f6","RWA":"#f59e0b","AI":"#8b5cf6",
     "Infrastructure":"#10b981","NFT":"#ec4899",
     "Gaming":"#f97316","Institutional":"#06b6d4","Other":"#6b7280",
-}
+}}
 
 AXIS = dict(gridcolor="#1A3320",showgrid=True,zeroline=False,color="#A0C8B0",tickfont=dict(color="#A0C8B0",size=11))
 BASE_LAYOUT = dict(
@@ -87,63 +90,67 @@ BASE_LAYOUT = dict(
 BLOCKCHAIN_KW = ["crypto","blockchain","web3","defi","nft","token","chain","onchain",
                  "l2","layer2","wallet","protocol","dao","dapp","eth","btc","sol","bnb","mantle","base"]
 
+RESEARCH_KW = [
+    "research","analysis","report","thread","deep dive","breakdown",
+    "insight","data","metrics","onchain","on-chain","study","findings",
+    "trends","outlook","review","alpha","thesis","framework","explained",
+    "chart","graph","stat","billion","million","growth","decline","market","protocol",
+]
+
+RESEARCH_ACCOUNTS = ["a16zcrypto","MessariCrypto","TheBlockCo","Delphi_Digital","glassnode"]
+
 def get_token():
     try: return st.secrets["TWITTER_BEARER_TOKEN"]
     except: return None
 
-def hdrs(t): return {"Authorization":f"Bearer {t}"}
+def hdrs(t): return {{"Authorization":f"Bearer {{t}}"}}
 
 @st.cache_data(ttl=600)
 def get_user(handle,token):
-    r=requests.get(f"https://api.twitter.com/2/users/by/username/{handle}",
-        headers=hdrs(token),params={"user.fields":"public_metrics,description"})
-    return r.json().get("data",{}) if r.status_code==200 else {}
+    r=requests.get(f"https://api.twitter.com/2/users/by/username/{{handle}}",
+        headers=hdrs(token),params={{"user.fields":"public_metrics,description"}})
+    return r.json().get("data",{{}}) if r.status_code==200 else {{}}
 
 @st.cache_data(ttl=600)
 def get_tweets(uid,token,start_iso,end_iso,max_results=100):
-    params={"max_results":min(max_results,100),"start_time":start_iso,"end_time":end_iso,
+    params={{"max_results":min(max_results,100),"start_time":start_iso,"end_time":end_iso,
             "tweet.fields":"public_metrics,created_at,text",
-            "exclude":"retweets,replies"}
-    r=requests.get(f"https://api.twitter.com/2/users/{uid}/tweets",headers=hdrs(token),params=params)
+            "exclude":"retweets,replies"}}
+    r=requests.get(f"https://api.twitter.com/2/users/{{uid}}/tweets",headers=hdrs(token),params=params)
     if r.status_code!=200: return []
     return r.json().get("data",[]) or []
 
 @st.cache_data(ttl=600)
 def search_tweets(query,token,start_iso,end_iso,max_results=50):
-    params={"query":query,"max_results":min(max_results,100),
+    params={{"query":query,"max_results":min(max_results,100),
             "start_time":start_iso,"end_time":end_iso,
             "tweet.fields":"public_metrics,created_at,author_id,text",
-            "expansions":"author_id","user.fields":"username,name,public_metrics"}
+            "expansions":"author_id","user.fields":"username,name,public_metrics"}}
     r=requests.get("https://api.twitter.com/2/tweets/search/recent",headers=hdrs(token),params=params)
     if r.status_code!=200: return []
     data=r.json()
     tweets=data.get("data",[])
-    users={u["id"]:u for u in data.get("includes",{}).get("users",[])}
+    users={{u["id"]:u for u in data.get("includes",{{}}).get("users",[])}}
     for t in tweets:
-        u=users.get(t.get("author_id"),{})
+        u=users.get(t.get("author_id"),{{}})
         t["author_name"]=u.get("name","Unknown")
         t["author_handle"]=u.get("username","unknown")
-        t["author_followers"]=u.get("public_metrics",{}).get("followers_count",0)
+        t["author_followers"]=u.get("public_metrics",{{}}).get("followers_count",0)
     return tweets
-
-def filter_by_kw(tweets, kw):
-    if not kw: return tweets
-    kw_lower = kw.lower()
-    return [t for t in tweets if kw_lower in t.get("text","").lower()]
 
 def fmt(n):
     if not n: return "0"
     n=int(n)
-    if n>=1_000_000_000: return f"{n/1_000_000_000:.1f}B"
-    if n>=1_000_000:     return f"{n/1_000_000:.1f}M"
-    if n>=1_000:         return f"{n/1_000:.1f}K"
+    if n>=1_000_000_000: return f"{{n/1_000_000_000:.1f}}B"
+    if n>=1_000_000:     return f"{{n/1_000_000:.1f}}M"
+    if n>=1_000:         return f"{{n/1_000:.1f}}K"
     return str(n)
 
 def eng(m):
     return (m.get("like_count",0) or 0)+(m.get("retweet_count",0) or 0)*3+(m.get("reply_count",0) or 0)*2
 
 def get_imp(t):
-    m=t.get("public_metrics",{})
+    m=t.get("public_metrics",{{}})
     v=m.get("impression_count") or 0
     if v>0: return v
     return eng(m)*100
@@ -156,10 +163,10 @@ def parse_dt(s):
 
 def time_ago(s):
     d=datetime.utcnow()-parse_dt(s)
-    if d.days>=1: return f"{d.days}d ago"
+    if d.days>=1: return f"{{d.days}}d ago"
     h=d.seconds//3600
-    if h>=1: return f"{h}h ago"
-    return f"{d.seconds//60}m ago"
+    if h>=1: return f"{{h}}h ago"
+    return f"{{d.seconds//60}}m ago"
 
 def detect_nar(text):
     tl=text.lower()
@@ -180,34 +187,33 @@ def group_by(tweets,period):
     rows=[]
     for t in tweets:
         dt=parse_dt(t["created_at"])
-        m=t.get("public_metrics",{})
+        m=t.get("public_metrics",{{}})
         if period=="Day": key=dt.date()
         elif period=="Week": key=dt.date()-timedelta(days=dt.weekday())
         else: key=dt.date().replace(day=1)
-        imp=get_imp(t)
-        rows.append({"period":key,"likes":m.get("like_count",0) or 0,
+        rows.append({{"period":key,"likes":m.get("like_count",0) or 0,
                      "retweets":m.get("retweet_count",0) or 0,
                      "replies":m.get("reply_count",0) or 0,
-                     "eng_val":eng(m),"impressions":imp})
+                     "eng_val":eng(m),"impressions":get_imp(t)}})
     if not rows:
         return pd.DataFrame(columns=["period","likes","retweets","replies","eng_val","impressions"])
     return pd.DataFrame(rows).groupby("period").sum().reset_index().sort_values("period")
 
 def date_controls(pfx):
-    if f"{pfx}_sv" not in st.session_state:
-        st.session_state[f"{pfx}_sv"]=date.today()-timedelta(days=7)
-    if f"{pfx}_ev" not in st.session_state:
-        st.session_state[f"{pfx}_ev"]=date.today()
+    if f"{{pfx}}_sv" not in st.session_state:
+        st.session_state[f"{{pfx}}_sv"]=date.today()-timedelta(days=7)
+    if f"{{pfx}}_ev" not in st.session_state:
+        st.session_state[f"{{pfx}}_ev"]=date.today()
     c1,c2,c3=st.columns([2,2,1])
     with c1:
-        start=st.date_input("From",value=st.session_state[f"{pfx}_sv"],max_value=date.today(),key=f"{pfx}_s")
-        st.session_state[f"{pfx}_sv"]=start
+        start=st.date_input("From",value=st.session_state[f"{{pfx}}_sv"],max_value=date.today(),key=f"{{pfx}}_s")
+        st.session_state[f"{{pfx}}_sv"]=start
     with c2:
-        end=st.date_input("To",value=st.session_state[f"{pfx}_ev"],max_value=date.today(),key=f"{pfx}_e")
-        st.session_state[f"{pfx}_ev"]=end
+        end=st.date_input("To",value=st.session_state[f"{{pfx}}_ev"],max_value=date.today(),key=f"{{pfx}}_e")
+        st.session_state[f"{{pfx}}_ev"]=end
     with c3:
         st.markdown("<div style='height:28px'></div>",unsafe_allow_html=True)
-        period=st.selectbox("Group by",["Day","Week","Month"],key=f"{pfx}_p",label_visibility="collapsed")
+        period=st.selectbox("Group by",["Day","Week","Month"],key=f"{{pfx}}_p",label_visibility="collapsed")
     return start,end,period
 
 def kpi(col,label,value,delta=None,sub=None,color=MANTLE_GREEN):
@@ -215,123 +221,93 @@ def kpi(col,label,value,delta=None,sub=None,color=MANTLE_GREEN):
     if delta is not None:
         cls="kpi-delta-up" if delta>=0 else "kpi-delta-dn"
         arrow="▲" if delta>=0 else "▼"
-        d=f'<div class="{cls}">{arrow} {abs(delta):.1f}% vs prev period</div>'
+        d=f'<div class="{{cls}}">{{arrow}} {{abs(delta):.1f}}% vs prev period</div>'
     elif sub:
-        d=f'<div class="kpi-neutral">{sub}</div>'
+        d=f'<div class="kpi-neutral">{{sub}}</div>'
     col.markdown(f"""
     <div class="kpi-card">
-      <div class="kpi-label">{label}</div>
-      <div class="kpi-value" style="color:{color}">{value}</div>
-      {d}
+      <div class="kpi-label">{{label}}</div>
+      <div class="kpi-value" style="color:{{color}}">{{value}}</div>
+      {{d}}
     </div>""",unsafe_allow_html=True)
 
 def render_post(t,rank,color,chain_name=None,is_user=False):
-    m=t.get("public_metrics",{})
+    m=t.get("public_metrics",{{}})
     text=t.get("text","")
     brief=text[:200]+("…" if len(text)>200 else "")
-    ev=eng(m)
     imp=get_imp(t)
     tid=t.get("id","")
     if is_user:
         handle=t.get("author_handle","unknown")
-        name=t.get("author_name","User")
         followers=t.get("author_followers",0)
     else:
-        handle={"Mantle":"Mantle_Official","Solana":"solana","Base":"base"}.get(chain_name,"")
-        name=chain_name or "Official"
+        handle={{"Mantle":"Mantle_Official","Solana":"solana","Base":"base"}}.get(chain_name,"")
         followers=None
-    link=f"https://x.com/{handle}/status/{tid}" if tid else "#"
+    link=f"https://x.com/{{handle}}/status/{{tid}}" if tid else "#"
     ago=time_ago(t.get("created_at",""))
     narrs=detect_nar(text)
-    badge=f'<span class="narrative-pill" style="background:{color}22;color:{color};border:1px solid {color}44;font-size:10px;padding:2px 8px;border-radius:99px">{chain_name}</span>' if chain_name else ""
-    pills=" ".join([f'<span class="narrative-pill" style="background:{NARRATIVE_COLORS.get(n,"#333")}22;color:{NARRATIVE_COLORS.get(n,"#888")};border:1px solid {NARRATIVE_COLORS.get(n,"#333")}33">{n}</span>' for n in narrs])
-    fstr=f" · {fmt(followers)} followers" if followers else ""
+    badge=f'<span class="narrative-pill" style="background:{{color}}22;color:{{color}};border:1px solid {{color}}44;font-size:10px;padding:2px 8px;border-radius:99px">{{chain_name}}</span>' if chain_name else ""
+    pills=" ".join([f'<span class="narrative-pill" style="background:{{NARRATIVE_COLORS.get(n,"#333")}}22;color:{{NARRATIVE_COLORS.get(n,"#888")}};border:1px solid {{NARRATIVE_COLORS.get(n,"#333")}}33">{{n}}</span>' for n in narrs])
+    fstr=f" · {{fmt(followers)}} followers" if followers else ""
     st.markdown(f"""
     <div class="post-card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
         <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-          <span style="font-size:16px;font-weight:800;color:#333;min-width:24px">#{rank}</span>
+          <span style="font-size:16px;font-weight:800;color:#333;min-width:24px">#{{rank}}</span>
           <div>
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-              {badge}<span class="post-handle">@{handle}</span>
-              <span class="post-meta">{ago}{fstr}</span>
+              {{badge}}<span class="post-handle">@{{handle}}</span>
+              <span class="post-meta">{{ago}}{{fstr}}</span>
             </div>
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:14px;font-weight:800;color:{color}">{fmt(imp)}</div>
-          <div style="font-size:10px;color:{MANTLE_MUTED}">views</div>
+          <div style="font-size:14px;font-weight:800;color:{{color}}">{{fmt(imp)}}</div>
+          <div style="font-size:10px;color:{{MANTLE_MUTED}}">views</div>
         </div>
       </div>
-      <div class="post-text">{brief}</div>
-      <div style="margin-bottom:8px">{pills}</div>
+      <div class="post-text">{{brief}}</div>
+      <div style="margin-bottom:8px">{{pills}}</div>
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:12px;color:{MANTLE_MUTED}">
-          ♥ {fmt(m.get("like_count",0))} &nbsp;·&nbsp;
-          ↺ {fmt(m.get("retweet_count",0))} &nbsp;·&nbsp;
-          💬 {fmt(m.get("reply_count",0))}
+        <div style="font-size:12px;color:{{MANTLE_MUTED}}">
+          ♥ {{fmt(m.get("like_count",0))}} &nbsp;·&nbsp;
+          ↺ {{fmt(m.get("retweet_count",0))}} &nbsp;·&nbsp;
+          💬 {{fmt(m.get("reply_count",0))}}
         </div>
-        <a href="{link}" target="_blank" style="font-size:11px;color:{color};text-decoration:none;padding:4px 12px;border:1px solid {color}44;border-radius:6px;white-space:nowrap;background:{color}11;font-weight:600">View ↗</a>
+        <a href="{{link}}" target="_blank" style="font-size:11px;color:{{color}};text-decoration:none;padding:4px 12px;border:1px solid {{color}}44;border-radius:6px;white-space:nowrap;background:{{color}}11;font-weight:600">View ↗</a>
       </div>
     </div>""",unsafe_allow_html=True)
 
-def kw_bar(key_input, key_btn, key_clear, placeholder):
-    """Keyword search bar — compact inline layout, no clear button"""
-    c1,c2=st.columns([5,1])
-    with c1:
-        kw=st.text_input("Keyword",placeholder=placeholder,key=key_input,label_visibility="collapsed")
-    with c2:
-        search=st.button("Search",key=key_btn,use_container_width=True)
-    sk=f"{key_input}_active"
-    if search and kw:
-        st.session_state[sk]=kw
-    if search and not kw:
-        st.session_state[sk]=""
-    active=st.session_state.get(sk,"")
-    if active:
-        st.markdown(f'<div class="kw-active">🔍 Filtering: <b>{active}</b></div>',unsafe_allow_html=True)
-    return active
+def tab_description(title, description, accounts, data_range):
+    accounts_str=" &nbsp;·&nbsp; ".join([f"<b>@{{a}}</b>" for a in accounts])
+    st.markdown(f"""
+    <div class="tab-desc">
+      <div class="tab-desc-title">{{title}}</div>
+      <div class="tab-desc-body">
+        {{description}}<br>
+        <span style="margin-top:4px;display:block">📡 <b>Sources:</b> {{accounts_str}}</span>
+        <span>📅 <b>Data range:</b> {{data_range}}</span>
+      </div>
+    </div>""",unsafe_allow_html=True)
 
-def kw_date_row(kw_key_input, kw_key_btn, kw_key_clear, kw_placeholder, date_pfx):
-    """Keyword + date controls in one compact row"""
-    st.markdown('<div class="section-title">Filter & Date Range</div>',unsafe_allow_html=True)
-    c1,c2,c3,c4,c5=st.columns([3,1,2,2,1])
-    with c1:
-        kw=st.text_input("kw",placeholder=kw_placeholder,key=kw_key_input,label_visibility="collapsed")
-    with c2:
-        search=st.button("Search",key=kw_key_btn,use_container_width=True)
-    sk=f"{kw_key_input}_active"
-    if search and kw:
-        st.session_state[sk]=kw
-    if search and not kw:
-        st.session_state[sk]=""
-    active=st.session_state.get(sk,"")
-
-    # date controls inline
-    if f"{date_pfx}_sv" not in st.session_state:
-        st.session_state[f"{date_pfx}_sv"]=date.today()-timedelta(days=7)
-    if f"{date_pfx}_ev" not in st.session_state:
-        st.session_state[f"{date_pfx}_ev"]=date.today()
-    with c3:
-        start=st.date_input("From",value=st.session_state[f"{date_pfx}_sv"],max_value=date.today(),key=f"{date_pfx}_s")
-        st.session_state[f"{date_pfx}_sv"]=start
-    with c4:
-        end=st.date_input("To",value=st.session_state[f"{date_pfx}_ev"],max_value=date.today(),key=f"{date_pfx}_e")
-        st.session_state[f"{date_pfx}_ev"]=end
-    with c5:
-        period=st.selectbox("Group",["Day","Week","Month"],key=f"{date_pfx}_p",label_visibility="collapsed")
-
-    if active:
-        st.markdown(f'<div class="kw-active">🔍 Filtering: <b>{active}</b></div>',unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="search-note">💡 Enter a keyword to filter the entire dashboard</div>',unsafe_allow_html=True)
-    return active, start, end, period
+def split_top_posts(tweets, n=5):
+    """Split into top-n by views and top-n by engagement, no overlap"""
+    by_views=sorted(tweets,key=get_imp,reverse=True)
+    top_views=by_views[:n]
+    views_ids={{t.get("id") for t in top_views}}
+    remaining=[t for t in tweets if t.get("id") not in views_ids]
+    top_eng=sorted(remaining,key=lambda t:eng(t.get("public_metrics",{{}})),reverse=True)[:n]
+    return top_views,top_eng
 
 # ── TAB 1 ────────────────────────────────────────────────────────────────────
 def tab_mantle(token):
-    st.markdown('<div class="tab-title">Mantle — Performance Deep Dive</div>',unsafe_allow_html=True)
-    kw,start,end,period=kw_date_row("t1_kw","t1_kw_btn","t1_kw_clr",
-        "Filter by keyword — e.g. RWA, mETH, DeFi…","t1")
+    tab_description(
+        "Mantle — Performance Deep Dive",
+        "Tracks all original posts from the official Mantle account. Shows impressions, engagement trends, narrative breakdown, and top-performing content.",
+        ["Mantle_Official"],
+        "Custom date range (user-selected)"
+    )
+    start,end,period=date_controls("t1")
     start_iso,end_iso=iso_range(start,end)
     days=(end-start).days+1
     prev_s_iso,prev_e_iso=iso_range(start-timedelta(days=days),start-timedelta(days=1))
@@ -339,18 +315,14 @@ def tab_mantle(token):
     with st.spinner("Fetching Mantle data…"):
         user=get_user("Mantle_Official",token)
         uid=user.get("id","")
-        all_tweets=get_tweets(uid,token,start_iso,end_iso) if uid else []
-        all_prev=get_tweets(uid,token,prev_s_iso,prev_e_iso) if uid else []
+        tweets=get_tweets(uid,token,start_iso,end_iso) if uid else []
+        prev_tw=get_tweets(uid,token,prev_s_iso,prev_e_iso) if uid else []
 
-    # apply keyword filter
-    tweets=filter_by_kw(all_tweets,kw)
-    prev_tw=filter_by_kw(all_prev,kw)
-
-    followers=user.get("public_metrics",{}).get("followers_count",0) or 0
-    total_eng=sum(eng(t.get("public_metrics",{})) for t in tweets)
-    prev_eng=sum(eng(t.get("public_metrics",{})) for t in prev_tw)
-    total_likes=sum(t.get("public_metrics",{}).get("like_count",0) or 0 for t in tweets)
-    total_rts=sum(t.get("public_metrics",{}).get("retweet_count",0) or 0 for t in tweets)
+    followers=user.get("public_metrics",{{}}).get("followers_count",0) or 0
+    total_eng=sum(eng(t.get("public_metrics",{{}})) for t in tweets)
+    prev_eng=sum(eng(t.get("public_metrics",{{}})) for t in prev_tw)
+    total_likes=sum(t.get("public_metrics",{{}}).get("like_count",0) or 0 for t in tweets)
+    total_rts=sum(t.get("public_metrics",{{}}).get("retweet_count",0) or 0 for t in tweets)
     total_views=sum(get_imp(t) for t in tweets)
     post_count=len(tweets)
     prev_posts=len(prev_tw)
@@ -363,8 +335,8 @@ def tab_mantle(token):
     kpi(k1,"Followers",fmt(followers),sub="current total")
     kpi(k2,"Posts published",str(post_count),delta=post_delta)
     kpi(k3,"Total views",fmt(total_views),delta=view_delta)
-    kpi(k4,"Total likes",fmt(total_likes),sub=f"Retweets: {fmt(total_rts)}")
-    kpi(k5,"Eng. rate",f"{eng_rate:.2f}%",sub="engagement / views")
+    kpi(k4,"Total likes",fmt(total_likes),sub=f"Retweets: {{fmt(total_rts)}}")
+    kpi(k5,"Eng. rate",f"{{eng_rate:.2f}}%",sub="engagement / views")
 
     st.markdown("<div style='margin-top:16px'></div>",unsafe_allow_html=True)
 
@@ -373,21 +345,22 @@ def tab_mantle(token):
         fig=go.Figure()
         fig.add_trace(go.Bar(x=df["period"],y=df["impressions"],name="Views",
                              marker_color=MANTLE_GREEN,opacity=0.8,
-                             hovertemplate="%{x}: %{y:,}<extra>Views</extra>"))
+                             hovertemplate="%{{x}}: %{{y:,}}<extra>Views</extra>"))
         fig.add_trace(go.Scatter(x=df["period"],y=df["eng_val"],name="Engagement",
                                  mode="lines+markers",yaxis="y2",
                                  line=dict(color="#f59e0b",width=2),marker=dict(size=5),
-                                 hovertemplate="%{x}: %{y:,}<extra>Engagement</extra>"))
-        title_kw=f' · keyword: "{kw}"' if kw else ""
+                                 hovertemplate="%{{x}}: %{{y:,}}<extra>Engagement</extra>"))
         fig.update_layout(**BASE_LAYOUT,height=280,
                           xaxis=AXIS,
                           yaxis=dict(**AXIS,title="Views"),
-                          yaxis2=dict(title=dict(text="Engagement",font=dict(color="#f59e0b")),overlaying="y",side="right",
-                                      showgrid=False,zeroline=False,tickfont=dict(color="#f59e0b")),
-                          title=dict(text=f"Views & Engagement by {period} — @Mantle_Official{title_kw}",
+                          yaxis2=dict(title=dict(text="Engagement",font=dict(color="#f59e0b")),
+                                      overlaying="y",side="right",showgrid=False,zeroline=False,
+                                      tickfont=dict(color="#f59e0b")),
+                          title=dict(text=f"Views & Engagement by {{period}} — @Mantle_Official",
                                      font=dict(size=13,color="#E0F5EC"),x=0))
         st.plotly_chart(fig,use_container_width=True)
 
+    # Narrative breakdown
     all_nar=[]
     for t in tweets: all_nar.extend(detect_nar(t.get("text","")))
     nar_counts=Counter(all_nar)
@@ -401,8 +374,8 @@ def tab_mantle(token):
             fp=go.Figure(go.Pie(labels=labels,values=values,
                                 marker=dict(colors=colors,line=dict(color=MANTLE_DARK,width=2)),
                                 textfont_size=11,hole=0.55,
-                                hovertemplate="%{label}: %{value} posts<extra></extra>"))
-            pl={k:v for k,v in BASE_LAYOUT.items() if k!="margin"}
+                                hovertemplate="%{{label}}: %{{value}} posts<extra></extra>"))
+            pl={{k:v for k,v in BASE_LAYOUT.items() if k!="margin"}}
             fp.update_layout(**pl,height=220,showlegend=False,margin=dict(l=0,r=0,t=10,b=0))
             st.plotly_chart(fp,use_container_width=True)
         with nc2:
@@ -412,67 +385,82 @@ def tab_mantle(token):
                 pct=cnt/total_n*100
                 st.markdown(f"""
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-                  <div style="width:10px;height:10px;border-radius:2px;background:{c};flex-shrink:0"></div>
-                  <div style="flex:1;font-size:13px;color:{MANTLE_TEXT};font-weight:500">{nm}</div>
-                  <div style="font-size:12px;color:{MANTLE_MUTED}">{cnt} posts · {pct:.0f}%</div>
-                  <div style="width:80px;background:{MANTLE_BORDER};border-radius:4px;height:6px">
-                    <div style="width:{pct}%;background:{c};border-radius:4px;height:6px"></div>
+                  <div style="width:10px;height:10px;border-radius:2px;background:{{c}};flex-shrink:0"></div>
+                  <div style="flex:1;font-size:13px;color:{{MANTLE_TEXT}};font-weight:500">{{nm}}</div>
+                  <div style="font-size:12px;color:{{MANTLE_MUTED}}">{{cnt}} posts · {{pct:.0f}}%</div>
+                  <div style="width:80px;background:{{MANTLE_BORDER}};border-radius:4px;height:6px">
+                    <div style="width:{{pct}}%;background:{{c}};border-radius:4px;height:6px"></div>
                   </div>
                 </div>""",unsafe_allow_html=True)
 
-    sorted_tw=sorted(tweets,key=get_imp,reverse=True)
-    st.markdown('<div class="section-title">Top 5 Posts by Views — Mantle Official</div>',unsafe_allow_html=True)
-    if sorted_tw:
-        for i,t in enumerate(sorted_tw[:5],1):
-            render_post(t,i,MANTLE_GREEN,chain_name="Mantle",is_user=False)
-    else:
-        st.info("No posts found for this time range." + (f' Try removing the keyword filter "{kw}".' if kw else ""))
+    # Top posts — split by views vs engagement, no overlap
+    top_views,top_eng=split_top_posts(tweets,n=5)
+    st.markdown('<div class="section-title">Top Posts</div>',unsafe_allow_html=True)
+    col_v,col_e=st.columns(2)
+    with col_v:
+        st.markdown(f'<div style="font-size:12px;font-weight:800;color:{{MANTLE_GREEN}};margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">👁 Top 5 by Views</div>',unsafe_allow_html=True)
+        if top_views:
+            for i,t in enumerate(top_views,1):
+                render_post(t,i,MANTLE_GREEN,chain_name="Mantle",is_user=False)
+        else:
+            st.info("No posts found.")
+    with col_e:
+        st.markdown(f'<div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">⚡ Top 5 by Engagement</div>',unsafe_allow_html=True)
+        if top_eng:
+            for i,t in enumerate(top_eng,1):
+                render_post(t,i,"#f59e0b",chain_name="Mantle",is_user=False)
+        else:
+            st.info("No additional posts.")
 
 # ── TAB 2 ────────────────────────────────────────────────────────────────────
 def tab_competitive(token):
-    st.markdown('<div class="tab-title">Competitive Analysis — Mantle vs Solana vs Base</div>',unsafe_allow_html=True)
-    kw,start,end,period=kw_date_row("t2_kw","t2_kw_btn","t2_kw_clr",
-        "Filter all chains by keyword — e.g. RWA, institutional…","t2")
+    tab_description(
+        "Competitive Analysis — Mantle vs Solana vs Base",
+        "Compares official post performance across 3 chains side by side. Includes views, engagement trends, narrative distribution, and top KOL mentions from the last 7 days.",
+        ["Mantle_Official","solana","base"],
+        "Official posts: custom date range · KOL mentions: last 7 days"
+    )
+    start,end,period=date_controls("t2")
     start_iso,end_iso=iso_range(start,end)
     days=(end-start).days+1
     prev_s_iso,prev_e_iso=iso_range(start-timedelta(days=days),start-timedelta(days=1))
     si7,ei7=search_iso()
 
-    all_data={}
+    all_data={{}}
     with st.spinner("Fetching all chains…"):
         for name,color in CHAIN_COLORS.items():
-            handle={"Mantle":"Mantle_Official","Solana":"solana","Base":"base"}[name]
+            handle={{"Mantle":"Mantle_Official","Solana":"solana","Base":"base"}}[name]
             u=get_user(handle,token)
             uid=u.get("id","")
-            raw_tw=get_tweets(uid,token,start_iso,end_iso) if uid else []
-            raw_prev=get_tweets(uid,token,prev_s_iso,prev_e_iso) if uid else []
-            tw=filter_by_kw(raw_tw,kw)
-            ptw=filter_by_kw(raw_prev,kw)
-            all_data[name]={"user":u,"tweets":tw,"prev":ptw,"color":color,"handle":handle}
+            tw=get_tweets(uid,token,start_iso,end_iso) if uid else []
+            ptw=get_tweets(uid,token,prev_s_iso,prev_e_iso) if uid else []
+            all_data[name]={{"user":u,"tweets":tw,"prev":ptw,"color":color,"handle":handle}}
 
+    # KPI snapshot
     st.markdown('<div class="section-title">Performance Snapshot</div>',unsafe_allow_html=True)
     cols=st.columns(len(CHAIN_COLORS))
     for col,(name,d) in zip(cols,all_data.items()):
         color=d["color"]
-        followers=d["user"].get("public_metrics",{}).get("followers_count",0) or 0
+        followers=d["user"].get("public_metrics",{{}}).get("followers_count",0) or 0
         total_v=sum(get_imp(t) for t in d["tweets"])
         prev_v=sum(get_imp(t) for t in d["prev"])
         delta=((total_v-prev_v)/prev_v*100) if prev_v else 0
         arrow="▲" if delta>=0 else "▼"
-        dcls=f"color:{MANTLE_GREEN}" if delta>=0 else "color:#f87171"
+        dcls=f"color:{{MANTLE_GREEN}}" if delta>=0 else "color:#f87171"
         col.markdown(f"""
         <div class="kpi-card">
-          <div style="font-size:12px;font-weight:800;color:{color};text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">{name}</div>
-          <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:2px">Followers</div>
-          <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:10px">{fmt(followers)}</div>
-          <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:2px">Total views</div>
-          <div style="font-size:20px;font-weight:800;color:{color}">{fmt(total_v)}</div>
-          <div style="font-size:12px;{dcls};margin-top:4px;font-weight:600">{arrow} {abs(delta):.1f}% vs prev</div>
-          <div style="font-size:11px;color:{MANTLE_MUTED};margin-top:8px">{len(d['tweets'])} posts</div>
+          <div style="font-size:12px;font-weight:800;color:{{color}};text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">{{name}}</div>
+          <div style="font-size:11px;color:{{MANTLE_MUTED}};margin-bottom:2px">Followers</div>
+          <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:10px">{{fmt(followers)}}</div>
+          <div style="font-size:11px;color:{{MANTLE_MUTED}};margin-bottom:2px">Total views</div>
+          <div style="font-size:20px;font-weight:800;color:{{color}}">{{fmt(total_v)}}</div>
+          <div style="font-size:12px;{{dcls}};margin-top:4px;font-weight:600">{{arrow}} {{abs(delta):.1f}}% vs prev</div>
+          <div style="font-size:11px;color:{{MANTLE_MUTED}};margin-top:8px">{{len(d['tweets'])}} posts</div>
         </div>""",unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:16px'></div>",unsafe_allow_html=True)
 
+    # Views line chart
     fig=go.Figure()
     for name,d in all_data.items():
         df=group_by(d["tweets"],period)
@@ -480,47 +468,54 @@ def tab_competitive(token):
             fig.add_trace(go.Scatter(x=df["period"],y=df["impressions"],name=name,
                                      mode="lines+markers",
                                      line=dict(color=d["color"],width=2),marker=dict(size=5),
-                                     hovertemplate=f"{name}: %{{y:,}}<extra></extra>"))
-    title_kw=f' · keyword: "{kw}"' if kw else ""
+                                     hovertemplate=f"{{name}}: %{{y:,}}<extra></extra>"))
     fig.update_layout(**BASE_LAYOUT,height=280,xaxis=AXIS,yaxis=AXIS,
-                      title=dict(text=f"Views by {period} — all chains{title_kw}",
+                      title=dict(text=f"Views by {{period}} — all chains",
                                  font=dict(size=13,color="#E0F5EC"),x=0))
     st.plotly_chart(fig,use_container_width=True)
 
-    st.markdown('<div class="section-title">Top 3 Official Posts by Views</div>',unsafe_allow_html=True)
-    pcols=st.columns(len(CHAIN_COLORS))
-    for col,(name,d) in zip(pcols,all_data.items()):
-        stw=sorted(d["tweets"],key=get_imp,reverse=True)
-        with col:
-            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{d["color"]};margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">{name}</div>',unsafe_allow_html=True)
-            if stw:
-                for i,t in enumerate(stw[:3],1):
-                    render_post(t,i,d["color"],chain_name=name,is_user=False)
+    # Top posts per chain — split views vs engagement
+    st.markdown('<div class="section-title">Top Official Posts by Chain</div>',unsafe_allow_html=True)
+    for name,d in all_data.items():
+        color=d["color"]
+        top_views,top_eng=split_top_posts(d["tweets"],n=3)
+        st.markdown(f'<div style="font-size:13px;font-weight:800;color:{{color}};margin:14px 0 8px;text-transform:uppercase;letter-spacing:.08em">{{name}}</div>',unsafe_allow_html=True)
+        cv,ce=st.columns(2)
+        with cv:
+            st.markdown(f'<div style="font-size:11px;font-weight:700;color:{{color}};margin-bottom:8px">👁 Top 3 by Views</div>',unsafe_allow_html=True)
+            if top_views:
+                for i,t in enumerate(top_views,1): render_post(t,i,color,chain_name=name,is_user=False)
             else:
-                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>',unsafe_allow_html=True)
+                st.markdown(f'<div style="font-size:12px;color:{{MANTLE_MUTED}}">No data</div>',unsafe_allow_html=True)
+        with ce:
+            st.markdown(f'<div style="font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:8px">⚡ Top 3 by Engagement</div>',unsafe_allow_html=True)
+            if top_eng:
+                for i,t in enumerate(top_eng,1): render_post(t,i,"#f59e0b",chain_name=name,is_user=False)
+            else:
+                st.markdown(f'<div style="font-size:12px;color:{{MANTLE_MUTED}}">No additional posts</div>',unsafe_allow_html=True)
 
-    st.markdown('<div class="section-title">Top User / KOL Mentions by Views (last 7 days)</div>',unsafe_allow_html=True)
+    # KOL mentions
+    st.markdown('<div class="section-title">Top KOL Mentions by Views (last 7 days)</div>',unsafe_allow_html=True)
     mcols=st.columns(len(CHAIN_COLORS))
     for col,(name,d) in zip(mcols,all_data.items()):
         if name=="Base":
             q='"Base chain" OR "Base blockchain" OR "build on Base" (crypto OR blockchain OR web3) -from:base -is:retweet lang:en min_faves:50'
         elif name=="Solana":
-            q=f'(#Solana OR "Solana network" OR "SOL blockchain") (crypto OR blockchain OR defi OR web3) -from:solana -is:retweet lang:en min_faves:50'
+            q='(#Solana OR "Solana network" OR "SOL blockchain") (crypto OR blockchain OR defi OR web3) -from:solana -is:retweet lang:en min_faves:50'
         else:
-            q=f'(#Mantle OR "Mantle network" OR "Mantle blockchain" OR mETH) (crypto OR blockchain OR defi OR web3) -from:Mantle_Official -is:retweet lang:en min_faves:20'
-        with st.spinner(f"Fetching {name} mentions…"):
+            q='(#Mantle OR "Mantle network" OR "Mantle blockchain" OR mETH) (crypto OR blockchain OR defi OR web3) -from:Mantle_Official -is:retweet lang:en min_faves:20'
+        with st.spinner(f"Fetching {{name}} mentions…"):
             mentions=search_tweets(q,token,si7,ei7,max_results=100)
-        mentions=filter_by_kw(mentions,kw)
         mentions=[t for t in mentions if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
         sm=sorted(mentions,key=get_imp,reverse=True)
         with col:
-            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{d["color"]};margin-bottom:10px;text-transform:uppercase">{name} mentions</div>',unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{{d["color"]}};margin-bottom:10px;text-transform:uppercase">{{name}} mentions</div>',unsafe_allow_html=True)
             if sm:
-                for i,t in enumerate(sm[:3],1):
-                    render_post(t,i,d["color"],chain_name=name,is_user=True)
+                for i,t in enumerate(sm[:3],1): render_post(t,i,d["color"],chain_name=name,is_user=True)
             else:
-                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No mentions found</div>',unsafe_allow_html=True)
+                st.markdown(f'<div style="font-size:12px;color:{{MANTLE_MUTED}}">No mentions found</div>',unsafe_allow_html=True)
 
+    # Narrative comparison
     st.markdown('<div class="section-title">Narrative Distribution by Chain</div>',unsafe_allow_html=True)
     nfig=go.Figure()
     for name,d in all_data.items():
@@ -532,65 +527,47 @@ def tab_competitive(token):
             x=list(NARRATIVES.keys())+["Other"],
             y=[counts.get(k,0)/total*100 for k in list(NARRATIVES.keys())+["Other"]],
             marker_color=d["color"],
-            hovertemplate="%{x}: %{y:.1f}%<extra>"+name+"</extra>"))
+            hovertemplate="%{{x}}: %{{y:.1f}}%<extra>"+name+"</extra>"))
     nfig.update_layout(**BASE_LAYOUT,barmode="group",height=260,
                        xaxis=AXIS,yaxis=dict(**AXIS,ticksuffix="%"),
                        title=dict(text="Narrative distribution % by chain",
                                   font=dict(size=13,color="#E0F5EC"),x=0))
     st.plotly_chart(nfig,use_container_width=True)
 
-# Research accounts — hidden from UI
-RESEARCH_KW = [
-    "research","analysis","report","thread","deep dive","breakdown",
-    "insight","data","metrics","onchain","on-chain","study","findings",
-    "trends","outlook","review","alpha","thesis","framework","explained",
-    "how","why","what","chart","graph","stat","number","billion","million",
-    "growth","decline","increase","decrease","market","protocol","ecosystem",
-]
-RESEARCH_ACCOUNTS = [
-    "a16zcrypto",
-    "MessariCrypto",
-    "TheBlockCo",
-    "Delphi_Digital",
-    "glassnode",
-]
-
 # ── TAB 3 ────────────────────────────────────────────────────────────────────
 def tab_research(token):
-    st.markdown('<div class="tab-title">Industry Research — Notable Reads</div>',unsafe_allow_html=True)
-    kw,start,end,period=kw_date_row("t3_kw","t3_kw_btn","t3_kw_clr",
-        "Filter by topic — e.g. RWA, L2, DeFi, Mantle…","t3")
+    tab_description(
+        "Industry Research — Notable Reads",
+        "Aggregates research articles, data threads, and analysis from leading crypto research accounts. Ranked by views within the selected date range.",
+        RESEARCH_ACCOUNTS,
+        "Custom date range (user-selected)"
+    )
+    start,end,period=date_controls("t3")
     start_iso,end_iso=iso_range(start,end)
 
-    # Fetch from all research accounts
     all_posts=[]
-    with st.spinner("Fetching research posts from all accounts…"):
+    with st.spinner("Fetching research posts…"):
         for handle in RESEARCH_ACCOUNTS:
             u=get_user(handle,token)
             uid=u.get("id","")
             if not uid: continue
             tw=get_tweets(uid,token,start_iso,end_iso,max_results=100)
-            # tag each tweet with author info
             for t in tw:
                 t["author_handle"]=handle
                 t["author_name"]=u.get("name",handle)
-                t["author_followers"]=u.get("public_metrics",{}).get("followers_count",0)
+                t["author_followers"]=u.get("public_metrics",{{}}).get("followers_count",0)
             all_posts.extend(tw)
 
-    # apply keyword filter
-    filtered=filter_by_kw(all_posts,kw)
-    # keep only research/article content
-    filtered=[p for p in filtered if any(k in p.get("text","").lower() for k in RESEARCH_KW)]
+    filtered=[p for p in all_posts if any(k in p.get("text","").lower() for k in RESEARCH_KW)]
     sorted_posts=sorted(filtered,key=get_imp,reverse=True)
 
-    kw_label=f' · keyword: "{kw}"' if kw else ""
-    st.caption(f"Found {len(filtered)} posts from {len(RESEARCH_ACCOUNTS)} research accounts{kw_label}")
+    st.caption(f"Found {{len(filtered)}} research posts from {{len(RESEARCH_ACCOUNTS)}} accounts")
 
     if not filtered:
-        st.warning("No posts found. Try adjusting the date range or keyword.")
+        st.warning("No research posts found. Try adjusting the date range.")
         return
 
-    # Narrative distribution chart — all posts (not just top 15)
+    # Narrative distribution
     all_nar=[]
     for p in filtered: all_nar.extend(detect_nar(p.get("text","")))
     nar_counts=Counter(all_nar)
@@ -604,151 +581,19 @@ def tab_research(token):
             x=[n for n,_ in sn],
             y=[c/total_n*100 for _,c in sn],
             marker_color=[NARRATIVE_COLORS.get(n,"#666") for n,_ in sn],
-            text=[f"{c/total_n*100:.0f}%" for _,c in sn],
+            text=[f"{{c/total_n*100:.0f}}%" for _,c in sn],
             textposition="outside",
-            hovertemplate="%{x}: %{y:.1f}% (%{customdata} posts)<extra></extra>",
+            hovertemplate="%{{x}}: %{{y:.1f}}% (%{{customdata}} posts)<extra></extra>",
             customdata=[c for _,c in sn]))
         fb.update_layout(**BASE_LAYOUT,height=240,showlegend=False,
                          xaxis=AXIS,yaxis=dict(**AXIS,ticksuffix="%"),
-                         title=dict(text=f"Narrative distribution — {len(filtered)} posts{kw_label}",
+                         title=dict(text=f"Narrative distribution — {{len(filtered)}} posts",
                                     font=dict(size=13,color="#E0F5EC"),x=0))
         st.plotly_chart(fb,use_container_width=True)
 
-    # Top 15 posts by views
     st.markdown('<div class="section-title">Top 15 Research Posts by Views</div>',unsafe_allow_html=True)
     for i,t in enumerate(sorted_posts[:15],1):
         render_post(t,i,"#A0C8B0",is_user=True)
-
-# ── TAB 4: MARKET NARRATIVE ──────────────────────────────────────────────────
-# Queries per narrative — count tweets in last 7 days
-NARRATIVE_QUERIES = {
-    "DeFi":           "(defi OR dex OR yield OR liquidity OR lending OR amm) (crypto OR blockchain) -is:retweet lang:en",
-    "RWA":            "(rwa OR \"real world asset\" OR tokenized OR tokenization OR \"treasury token\") (crypto OR blockchain) -is:retweet lang:en",
-    "AI x Crypto":    "(ai OR \"artificial intelligence\" OR llm OR \"ai agent\") (crypto OR blockchain OR web3 OR defi) -is:retweet lang:en",
-    "Infrastructure": "(layer2 OR l2 OR rollup OR \"base layer\" OR validator OR restaking) (crypto OR blockchain) -is:retweet lang:en",
-    "NFT":            "(nft OR \"digital collectible\" OR mint OR pfp) (crypto OR blockchain) -is:retweet lang:en",
-    "Gaming":         "(gamefi OR \"play to earn\" OR p2e OR \"onchain game\" OR gaming) (crypto OR blockchain) -is:retweet lang:en",
-    "Institutional":  "(institutional OR etf OR blackrock OR fidelity OR \"hedge fund\" OR \"asset manager\") (crypto OR bitcoin OR ethereum) -is:retweet lang:en",
-    "Stablecoin":     "(stablecoin OR usdt OR usdc OR \"stable coin\" OR depeg) (crypto OR blockchain) -is:retweet lang:en",
-    "Meme":           "(memecoin OR meme OR \"dog coin\" OR shitcoin OR pump) (crypto OR blockchain) -is:retweet lang:en",
-}
-
-@st.cache_data(ttl=600)
-def count_narrative_tweets(query, token, start_iso, end_iso):
-    """Use search/recent with max_results=10 just to get meta.result_count"""
-    params={
-        "query": query,
-        "max_results": 10,
-        "start_time": start_iso,
-        "end_time": end_iso,
-        "tweet.fields": "public_metrics,created_at,text",
-        "expansions": "author_id",
-        "user.fields": "username,name,public_metrics",
-    }
-    r=requests.get("https://api.twitter.com/2/tweets/search/recent",
-                   headers=hdrs(token),params=params)
-    if r.status_code!=200: return 0, []
-    data=r.json()
-    # get sample tweets for top posts section
-    tweets=data.get("data",[]) or []
-    users={u["id"]:u for u in data.get("includes",{}).get("users",[])}
-    for t in tweets:
-        u=users.get(t.get("author_id"),{})
-        t["author_handle"]=u.get("username","unknown")
-        t["author_name"]=u.get("name","Unknown")
-        t["author_followers"]=u.get("public_metrics",{}).get("followers_count",0)
-    # result_count is more accurate than len(tweets)
-    count=data.get("meta",{}).get("result_count",len(tweets))
-    return count, tweets
-
-def tab_market(token):
-    st.markdown('<div class="tab-title">Market Narrative Trends — Last 7 Days</div>',unsafe_allow_html=True)
-    st.markdown('<div class="search-note">⚡ Based on X Search API — limited to last 7 days · ~9 API calls per load</div>',unsafe_allow_html=True)
-
-    si,ei=search_iso()
-
-    # Fetch counts for all narratives
-    st.markdown('<div class="section-title">Narrative Volume — Tweet Count</div>',unsafe_allow_html=True)
-
-    counts={}
-    sample_tweets={}
-    progress=st.progress(0,text="Fetching narrative data…")
-    for i,(name,q) in enumerate(NARRATIVE_QUERIES.items()):
-        progress.progress((i+1)/len(NARRATIVE_QUERIES),text=f"Fetching {name}…")
-        c,tw=count_narrative_tweets(q,token,si,ei)
-        counts[name]=c
-        sample_tweets[name]=tw
-    progress.empty()
-
-    if not any(counts.values()):
-        st.warning("No data returned. Check API token or try again later.")
-        return
-
-    # Sort by count
-    sorted_counts=sorted(counts.items(),key=lambda x:-x[1])
-    total=sum(v for _,v in sorted_counts) or 1
-
-    # Bar chart — tweet volume
-    fig=go.Figure(go.Bar(
-        x=[n for n,_ in sorted_counts],
-        y=[c for _,c in sorted_counts],
-        marker_color=[NARRATIVE_COLORS.get(n,"#6b7280") for n,_ in sorted_counts],
-        text=[f"{c:,}" for _,c in sorted_counts],
-        textposition="outside",
-        hovertemplate="%{x}: %{y:,} tweets<extra></extra>",
-    ))
-    fig.update_layout(**BASE_LAYOUT,height=300,showlegend=False,
-                      xaxis=AXIS,yaxis=AXIS,
-                      title=dict(text="Tweet volume by narrative — last 7 days",
-                                 font=dict(size=13,color="#E0F5EC"),x=0))
-    st.plotly_chart(fig,use_container_width=True)
-
-    # Pie chart — % share
-    c1,c2=st.columns([1,1])
-    with c1:
-        st.markdown('<div class="section-title">Narrative Share %</div>',unsafe_allow_html=True)
-        fp=go.Figure(go.Pie(
-            labels=[n for n,_ in sorted_counts],
-            values=[c for _,c in sorted_counts],
-            marker=dict(colors=[NARRATIVE_COLORS.get(n,"#6b7280") for n,_ in sorted_counts],
-                        line=dict(color=MANTLE_DARK,width=2)),
-            textfont_size=11,hole=0.5,
-            hovertemplate="%{label}: %{value:,} tweets (%{percent})<extra></extra>"))
-        pl={k:v for k,v in BASE_LAYOUT.items() if k!="margin"}
-        fp.update_layout(**pl,height=300,showlegend=True,margin=dict(l=0,r=0,t=10,b=0))
-        st.plotly_chart(fp,use_container_width=True)
-
-    with c2:
-        st.markdown('<div class="section-title">Ranking</div>',unsafe_allow_html=True)
-        for rank,(name,cnt) in enumerate(sorted_counts,1):
-            c=NARRATIVE_COLORS.get(name,"#666")
-            pct=cnt/total*100
-            st.markdown(f"""
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-              <div style="font-size:14px;font-weight:800;color:#555;min-width:20px">#{rank}</div>
-              <div style="width:10px;height:10px;border-radius:2px;background:{c};flex-shrink:0"></div>
-              <div style="flex:1;font-size:13px;color:{MANTLE_TEXT};font-weight:600">{name}</div>
-              <div style="font-size:12px;color:{MANTLE_MUTED}">{cnt:,} tweets</div>
-              <div style="width:80px;background:{MANTLE_BORDER};border-radius:4px;height:6px">
-                <div style="width:{pct}%;background:{c};border-radius:4px;height:6px"></div>
-              </div>
-              <div style="font-size:12px;color:{c};font-weight:700;min-width:36px">{pct:.1f}%</div>
-            </div>""",unsafe_allow_html=True)
-
-    # Sample top posts per top 3 narratives
-    st.markdown('<div class="section-title">Sample Posts — Top 3 Narratives</div>',unsafe_allow_html=True)
-    top3=[n for n,_ in sorted_counts[:3]]
-    cols=st.columns(3)
-    for col,name in zip(cols,top3):
-        c=NARRATIVE_COLORS.get(name,"#6b7280")
-        tw=sorted(sample_tweets.get(name,[]),key=get_imp,reverse=True)
-        with col:
-            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{c};margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">{name}</div>',unsafe_allow_html=True)
-            if tw:
-                for i,t in enumerate(tw[:3],1):
-                    render_post(t,i,c,is_user=True)
-            else:
-                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No sample posts</div>',unsafe_allow_html=True)
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
@@ -758,11 +603,11 @@ def main():
       <div style="display:flex;align-items:center;gap:14px">
         <div>
           <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.5px">Mantle Social Intelligence</div>
-          <div style="font-size:12px;color:{MANTLE_MUTED};margin-top:2px;font-weight:500">Mantle · Solana · Base &nbsp;·&nbsp; X API v2</div>
+          <div style="font-size:12px;color:{{MANTLE_MUTED}};margin-top:2px;font-weight:500">Mantle · Solana · Base &nbsp;·&nbsp; X API v2</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
-        <span class="live-pill">● Live · {datetime.now().strftime('%H:%M UTC')}</span>
+        <span class="live-pill">● Live · {{datetime.now().strftime('%H:%M UTC')}}</span>
       </div>
     </div>""",unsafe_allow_html=True)
 
