@@ -754,11 +754,10 @@ def main():
             st.cache_data.clear()
             st.rerun()
 
-    t1,t2,t3,t4=st.tabs(["📊  Mantle Deep Dive","⚔️  Competitive Analysis","🔬  Industry Research","🌐  Market Narratives"])
+    t1,t2,t3=st.tabs(["📊  Mantle Deep Dive","⚔️  Competitive Analysis","🔬  Industry Research"])
     with t1: tab_mantle(token)
     with t2: tab_competitive(token)
     with t3: tab_research(token)
-    with t4: tab_market(token)
 
 if __name__=="__main__":
     main()
