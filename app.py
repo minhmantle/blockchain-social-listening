@@ -563,11 +563,13 @@ def tab_competitive(token):
     mcols=st.columns(len(CHAIN_COLORS))
     for col,(name,d) in zip(mcols,all_data.items()):
         if name=="Base":
-            q='"Base chain" OR "Base blockchain" OR "build on Base" (crypto OR blockchain OR web3) -from:base -is:retweet lang:en'
+            q='"Base chain" OR "Base blockchain" OR "build on Base" (crypto OR blockchain OR web3) -from:base -is:retweet lang:en min_faves:50'
+        elif name=="Solana":
+            q=f'(#Solana OR "Solana network" OR "SOL blockchain") (crypto OR blockchain OR defi OR web3) -from:solana -is:retweet lang:en min_faves:50'
         else:
-            q=f'#{name} (crypto OR blockchain OR web3) -from:{d["handle"]} -is:retweet lang:en'
+            q=f'(#Mantle OR "Mantle network" OR "Mantle blockchain" OR mETH) (crypto OR blockchain OR defi OR web3) -from:Mantle_Official -is:retweet lang:en min_faves:20'
         with st.spinner(f"Fetching {name} mentions…"):
-            mentions=search_tweets(q,token,si7,ei7,max_results=30)
+            mentions=search_tweets(q,token,si7,ei7,max_results=100)
         mentions=[t for t in mentions if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
         sm=sorted(mentions,key=get_imp,reverse=True)
         with col:
