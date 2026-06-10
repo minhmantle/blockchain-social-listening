@@ -464,13 +464,13 @@ TWITTER_BEARER_TOKEN = "your_bearer_token_here"
             x=df_daily["date"],
             y=df_daily["likes"],
             name="Likes",
-            marker_color=color + "99",
+            marker_color=color,
         ))
         fig.add_trace(go.Bar(
             x=df_daily["date"],
             y=df_daily["retweets"],
             name="Retweets",
-            marker_color=color + "cc",
+            marker_color=color,
         ))
         fig.add_trace(go.Bar(
             x=df_daily["date"],
