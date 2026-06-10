@@ -146,7 +146,7 @@ def get_user(handle,token):
 @st.cache_data(ttl=300)
 def get_tweets(uid,token,start_iso,end_iso,max_results=100):
     params={"max_results":min(max_results,100),"start_time":start_iso,"end_time":end_iso,
-            "tweet.fields":"public_metrics,created_at,text",
+            "tweet.fields":"public_metrics,non_public_metrics,organic_metrics,created_at,text",
             "exclude":"retweets,replies"}
     r=requests.get(f"https://api.twitter.com/2/users/{uid}/tweets",headers=hdrs(token),params=params)
     if r.status_code!=200:
@@ -154,8 +154,13 @@ def get_tweets(uid,token,start_iso,end_iso,max_results=100):
         return []
     data=r.json()
     tweets=data.get("data",[])
-    if not tweets and "errors" in data:
-        st.warning(f"API returned errors: {data['errors']}")
+    for t in tweets:
+        pm=t.get("public_metrics",{})
+        for src in ["non_public_metrics","organic_metrics"]:
+            s=t.get(src,{})
+            if s.get("impression_count") and not pm.get("impression_count"):
+                pm["impression_count"]=s["impression_count"]
+        t["public_metrics"]=pm
     return tweets
 
 @st.cache_data(ttl=300)
