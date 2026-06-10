@@ -468,7 +468,7 @@ def tab_competitive(token):
             fig.add_trace(go.Scatter(x=df["period"],y=df["impressions"],name=name,
                                      mode="lines+markers",
                                      line=dict(color=d["color"],width=2),marker=dict(size=5),
-                                     hovertemplate=f"{name}: %{y:,}<extra></extra>"))
+                                     hovertemplate=f"{name}: " + "%{y:,}<extra></extra>"))
     fig.update_layout(**BASE_LAYOUT,height=280,xaxis=AXIS,yaxis=AXIS,
                       title=dict(text=f"Views by {period} — all chains",
                                  font=dict(size=13,color="#E0F5EC"),x=0))
