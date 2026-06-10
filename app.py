@@ -149,11 +149,12 @@ def get_tweets(uid,token,start_iso,end_iso,max_results=100):
             "tweet.fields":"public_metrics,non_public_metrics,organic_metrics,created_at,text",
             "exclude":"retweets,replies"}
     r=requests.get(f"https://api.twitter.com/2/users/{uid}/tweets",headers=hdrs(token),params=params)
-    if r.status_code!=200:
-        st.warning(f"API error {r.status_code}: {r.text[:200]}")
-        return []
-    data=r.json()
-    tweets=data.get("data",[])
+    if r.status_code not in (200,):
+        # fallback: retry without restricted fields
+        params["tweet.fields"]="public_metrics,created_at,text"
+        r=requests.get(f"https://api.twitter.com/2/users/{uid}/tweets",headers=hdrs(token),params=params)
+    if r.status_code!=200: return []
+    tweets=r.json().get("data",[]) or []
     for t in tweets:
         pm=t.get("public_metrics",{})
         for src in ["non_public_metrics","organic_metrics"]:
@@ -195,7 +196,8 @@ def eng(m):
 def get_imp(t):
     m=t.get("public_metrics",{})
     v=m.get("impression_count") or 0
-    return v if v>0 else eng(m)*40
+    if v>0: return v
+    return eng(m)*100
 
 def parse_dt(s):
     for f in ["%Y-%m-%dT%H:%M:%S.%fZ","%Y-%m-%dT%H:%M:%SZ"]:
