@@ -105,11 +105,12 @@ NARRATIVE_COLORS = {
 CHART_LAYOUT = dict(
     paper_bgcolor="#0d0d1a", plot_bgcolor="#0d0d1a",
     font=dict(color="#888", size=11, family="Inter"),
-    xaxis=dict(gridcolor="#1e1e3a", showgrid=True, zeroline=False),
-    yaxis=dict(gridcolor="#1e1e3a", showgrid=True, zeroline=False),
     legend=dict(bgcolor="rgba(0,0,0,0)", font_size=11),
     hovermode="x unified",
+    margin=dict(l=10, r=10, t=36, b=10),
 )
+
+AXIS_STYLE = dict(gridcolor="#1e1e3a", showgrid=True, zeroline=False, color="#666")
 
 def get_token():
     try:
@@ -387,17 +388,18 @@ def tab_mantle(token):
         ))
         fig.add_trace(go.Scatter(
             x=df["period"], y=df["eng_val"],
-            name="Engagement score", mode="lines+markers",
+            name="Engagement", mode="lines+markers",
             line=dict(color="#f59e0b", width=2), marker=dict(size=5),
             yaxis="y2", hovertemplate="%{x}: %{y:,}<extra>Engagement</extra>"
         ))
-        fig.update_layout(**CHART_LAYOUT,
-            barmode="group", height=280,
-            margin=dict(l=10, r=10, t=30, b=10),
-            yaxis=dict(title="Impressions", gridcolor="#1e1e3a"),
+        fig.update_layout(
+            **CHART_LAYOUT, height=280,
+            xaxis=AXIS_STYLE,
+            yaxis=dict(**AXIS_STYLE, title="Impressions"),
             yaxis2=dict(title="Engagement", overlaying="y", side="right",
-                        gridcolor="rgba(0,0,0,0)", showgrid=False),
-            title=dict(text=f"Impressions & Engagement by {period} — @{handle}", font_size=12, x=0)
+                        showgrid=False, zeroline=False, color="#f59e0b"),
+            title=dict(text=f"Impressions & Engagement by {period} — @{handle}",
+                       font_size=12, x=0, font_color="#aaa")
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -419,7 +421,7 @@ def tab_mantle(token):
                 textfont_size=11, hole=0.55,
                 hovertemplate="%{label}: %{value} posts<extra></extra>"
             ))
-            pie_layout = {k:v for k,v in CHART_LAYOUT.items() if k != "margin"}
+            pie_layout = {k:v for k,v in CHART_LAYOUT.items() if k not in ("margin","hovermode")}
             fig_pie.update_layout(**pie_layout, height=220, showlegend=False,
                                    margin=dict(l=0,r=0,t=10,b=0))
             st.plotly_chart(fig_pie, use_container_width=True)
@@ -511,10 +513,12 @@ def tab_competitive(token):
                 marker=dict(size=5),
                 hovertemplate=f"{name}: %{{y:,}}<extra></extra>"
             ))
-    fig.update_layout(**CHART_LAYOUT,
-        height=280,
-        margin=dict(l=10, r=10, t=30, b=10),
-        title=dict(text=f"Impressions by {period} — all chains", font_size=12, x=0)
+    fig.update_layout(
+        **CHART_LAYOUT, height=280,
+        xaxis=AXIS_STYLE,
+        yaxis=AXIS_STYLE,
+        title=dict(text=f"Impressions by {period} — all chains",
+                   font_size=12, x=0, font_color="#aaa")
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -578,9 +582,12 @@ def tab_competitive(token):
             marker_color=d["info"]["color"],
             hovertemplate="%{x}: %{y:.1f}%<extra>" + name + "</extra>"
         ))
-    nfig.update_layout(**CHART_LAYOUT, barmode="group", height=260,
-                       yaxis_ticksuffix="%",
-                       title=dict(text="Narrative distribution % by chain", font_size=12, x=0))
+    nfig.update_layout(
+        **CHART_LAYOUT, barmode="group", height=260,
+        xaxis=AXIS_STYLE,
+        yaxis=dict(**AXIS_STYLE, ticksuffix="%"),
+        title=dict(text="Narrative distribution % by chain", font_size=12, x=0, font_color="#aaa")
+    )
     st.plotly_chart(nfig, use_container_width=True)
 
     st.markdown('<div class="section-title">Keyword search — across all chains</div>',
@@ -636,8 +643,12 @@ def tab_industry(token):
                 marker_color=[NARRATIVE_COLORS.get(n,"#666") for n,_ in sn],
                 hovertemplate="%{x}: %{y} posts<extra></extra>"
             ))
-            fb.update_layout(**CHART_LAYOUT, height=220, showlegend=False,
-                              title=dict(text="Posts by narrative", font_size=12, x=0))
+            fb.update_layout(
+                **CHART_LAYOUT, height=220, showlegend=False,
+                xaxis=AXIS_STYLE,
+                yaxis=AXIS_STYLE,
+                title=dict(text="Posts by narrative", font_size=12, x=0, font_color="#aaa")
+            )
             st.plotly_chart(fb, use_container_width=True)
         with nc2:
             total_n = sum(nar_counts.values()) or 1
