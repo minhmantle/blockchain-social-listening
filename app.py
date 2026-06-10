@@ -368,8 +368,8 @@ def tab_mantle(token):
     df = group_by(tweets, period)
     if not df.empty:
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=df["period"], y=df["likes"],    name="Likes",    marker_color=color+"55"))
-        fig.add_trace(go.Bar(x=df["period"], y=df["retweets"], name="Retweets", marker_color=color+"99"))
+        fig.add_trace(go.Bar(x=df["period"], y=df["likes"],    name="Likes",    marker_color=color, opacity=0.4))
+        fig.add_trace(go.Bar(x=df["period"], y=df["retweets"], name="Retweets", marker_color=color, opacity=0.7))
         fig.add_trace(go.Bar(x=df["period"], y=df["replies"],  name="Replies",  marker_color=color))
         fig.update_layout(**CHART_LAYOUT, barmode="stack", height=260,
                           title=dict(text=f"Engagement by {period} — @{handle}", font_size=12, x=0))
