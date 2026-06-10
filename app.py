@@ -228,25 +228,33 @@ def group_by(tweets, period):
     return pd.DataFrame(rows).groupby("period").sum().reset_index().sort_values("period")
 
 def date_controls(pfx):
+    # Init defaults in session state
+    if f"{pfx}_start_val" not in st.session_state:
+        st.session_state[f"{pfx}_start_val"] = date.today() - timedelta(days=7)
+    if f"{pfx}_end_val" not in st.session_state:
+        st.session_state[f"{pfx}_end_val"] = date.today()
+
     c1,c2,c3,c4,c5 = st.columns([2,2,1,1,1])
-    with c1:
-        start = st.date_input("From", value=date.today()-timedelta(days=7),
-                               max_value=date.today(), key=f"{pfx}_start")
-    with c2:
-        end = st.date_input("To", value=date.today(),
-                             max_value=date.today(), key=f"{pfx}_end")
     with c3:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-        if st.button("7D",  key=f"{pfx}_7d",  use_container_width=True):
-            st.session_state[f"{pfx}_start"] = date.today()-timedelta(days=7)
-            st.session_state[f"{pfx}_end"]   = date.today()
-            st.rerun()
+        if st.button("7D", key=f"{pfx}_7d", use_container_width=True):
+            st.session_state[f"{pfx}_start_val"] = date.today() - timedelta(days=7)
+            st.session_state[f"{pfx}_end_val"]   = date.today()
     with c4:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if st.button("30D", key=f"{pfx}_30d", use_container_width=True):
-            st.session_state[f"{pfx}_start"] = date.today()-timedelta(days=30)
-            st.session_state[f"{pfx}_end"]   = date.today()
-            st.rerun()
+            st.session_state[f"{pfx}_start_val"] = date.today() - timedelta(days=30)
+            st.session_state[f"{pfx}_end_val"]   = date.today()
+    with c1:
+        start = st.date_input("From",
+                               value=st.session_state[f"{pfx}_start_val"],
+                               max_value=date.today(), key=f"{pfx}_start")
+        st.session_state[f"{pfx}_start_val"] = start
+    with c2:
+        end = st.date_input("To",
+                             value=st.session_state[f"{pfx}_end_val"],
+                             max_value=date.today(), key=f"{pfx}_end")
+        st.session_state[f"{pfx}_end_val"] = end
     with c5:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         period = st.selectbox("Group by", ["Day","Week","Month"],
