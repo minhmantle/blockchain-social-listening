@@ -77,12 +77,12 @@ section[data-testid="stSidebar"]{{display:none;}}
 .section-title{{
     font-size:13px;font-weight:800;color:{MANTLE_TEXT};
     text-transform:uppercase;letter-spacing:0.12em;
-    margin:24px 0 14px;border-bottom:1px solid {MANTLE_BORDER};
+    margin:12px 0 10px;border-bottom:1px solid {MANTLE_BORDER};
     padding-bottom:8px;
 }}
 .tab-title{{
     font-size:22px;font-weight:800;color:#fff;
-    letter-spacing:-0.3px;margin-bottom:20px;
+    letter-spacing:-0.3px;margin-bottom:10px;
 }}
 .header-bar{{
     display:flex;align-items:center;justify-content:space-between;
@@ -96,7 +96,7 @@ section[data-testid="stSidebar"]{{display:none;}}
 .search-note{{
     font-size:11px;color:{MANTLE_MUTED};
     background:{MANTLE_SURFACE};border:1px solid {MANTLE_BORDER};
-    border-radius:6px;padding:6px 12px;margin-bottom:10px;
+    border-radius:6px;padding:6px 12px;margin-bottom:6px;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -118,10 +118,10 @@ NARRATIVE_COLORS = {
     "Gaming":"#f97316","Institutional":"#06b6d4","Other":"#6b7280",
 }
 
-AXIS = dict(gridcolor="#1A3320",showgrid=True,zeroline=False,color="#4A7A5A")
+AXIS = dict(gridcolor="#1A3320",showgrid=True,zeroline=False,color="#A0C8B0",tickfont=dict(color="#A0C8B0",size=11))
 BASE_LAYOUT = dict(
     paper_bgcolor=MANTLE_SURFACE, plot_bgcolor=MANTLE_SURFACE,
-    font=dict(color="#4A7A5A",size=11,family="Inter"),
+    font=dict(color="#A0C8B0",size=11,family="Inter"),
     legend=dict(bgcolor="rgba(0,0,0,0)",font_size=11),
     hovermode="x unified",
     margin=dict(l=10,r=10,t=36,b=10),
@@ -332,9 +332,7 @@ def render_post(t,rank,color,chain_name=None,is_user=False):
 # ── TAB 1: MANTLE ────────────────────────────────────────────────────────────
 def tab_mantle(token):
     st.markdown('<div class="tab-title">Mantle — Performance Deep Dive</div>',unsafe_allow_html=True)
-
-    # Keyword search at top
-    st.markdown('<div class="section-title">Keyword Search</div>',unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🔍 Keyword Search</div>',unsafe_allow_html=True)
     st.markdown('<div class="search-note">⚡ Search is limited to the last 7 days (X API constraint)</div>',unsafe_allow_html=True)
     kw_col1,kw_col2=st.columns([4,1])
     with kw_col1:
@@ -343,13 +341,18 @@ def tab_mantle(token):
     with kw_col2:
         run_search=st.button("Search",key="t1_kw_btn",use_container_width=True)
 
-    if kw and run_search:
-        q=f'(#{kw} OR "{kw}") (#Mantle OR @Mantle_Official OR "Mantle blockchain" OR "Mantle network") (crypto OR blockchain OR web3) -is:retweet lang:en'
+    if run_search:
         si,ei=search_iso()
-        with st.spinner(f"Searching '{kw}' in Mantle context…"):
+        if kw:
+            q=f'(#{kw} OR "{kw}") (#Mantle OR @Mantle_Official OR "Mantle blockchain" OR "Mantle network") (crypto OR blockchain OR web3) -is:retweet lang:en'
+            label=f"**{kw}** in Mantle context"
+        else:
+            q='(#Mantle OR @Mantle_Official OR "Mantle network") (crypto OR blockchain OR web3) -is:retweet lang:en'
+            label="all Mantle mentions"
+        with st.spinner("Searching…"):
             results=search_tweets(q,token,si,ei,max_results=20)
         results=[t for t in results if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
-        st.caption(f"{len(results)} results for **{kw}** (last 7 days)")
+        st.caption(f"{len(results)} results for {label} (last 7 days)")
         if results:
             sr=sorted(results,key=get_imp,reverse=True)
             for i,t in enumerate(sr[:5],1):
@@ -409,10 +412,10 @@ def tab_mantle(token):
         fig.update_layout(**BASE_LAYOUT,height=280,
                           xaxis=AXIS,
                           yaxis=dict(**AXIS,title="Views"),
-                          yaxis2=dict(title="Engagement",overlaying="y",side="right",
-                                      showgrid=False,zeroline=False,color="#f59e0b"),
+                          yaxis2=dict(title=dict(text="Engagement",font=dict(color="#f59e0b")),overlaying="y",side="right",
+                                      showgrid=False,zeroline=False,tickfont=dict(color="#f59e0b")),
                           title=dict(text=f"Views & Engagement by {period} — @Mantle_Official",
-                                     font=dict(size=13,color=MANTLE_TEXT,weight=700),x=0))
+                                     font=dict(size=13,color="#E0F5EC"),x=0))
         st.plotly_chart(fig,use_container_width=True)
 
     # Narrative breakdown
@@ -460,7 +463,33 @@ def tab_mantle(token):
 # ── TAB 2: COMPETITIVE ───────────────────────────────────────────────────────
 def tab_competitive(token):
     st.markdown('<div class="tab-title">Competitive Analysis — Mantle vs Solana vs Base</div>',unsafe_allow_html=True)
-    st.markdown('<div class="search-note">⚡ Mentions & keyword search limited to last 7 days (X API constraint). Official posts use selected date range.</div>',unsafe_allow_html=True)
+
+    # Keyword search at top
+    st.markdown('<div class="section-title">🔍 Keyword Search — Across All Chains</div>',unsafe_allow_html=True)
+    st.markdown('<div class="search-note">⚡ Limited to last 7 days (X API constraint)</div>',unsafe_allow_html=True)
+    kw_c1,kw_c2=st.columns([4,1])
+    with kw_c1:
+        kw_top=st.text_input("",placeholder="e.g. RWA, institutional, partnership, airdrop…",
+                              key="t2_kw_top",label_visibility="collapsed")
+    with kw_c2:
+        run_kw_top=st.button("Search",key="t2_kw_top_btn",use_container_width=True)
+    if run_kw_top:
+        _si7,_ei7=search_iso()
+        if kw_top:
+            q=f'"{kw_top}" (Mantle OR Solana OR "Base chain") (blockchain OR crypto OR web3) -is:retweet lang:en'
+            label=f"**{kw_top}**"
+        else:
+            q='(Mantle OR Solana OR "Base chain") (blockchain OR crypto OR web3 OR defi) -is:retweet lang:en'
+            label="all chains (market-wide)"
+        with st.spinner("Searching…"):
+            _results=search_tweets(q,token,_si7,_ei7,max_results=30)
+        _results=[t for t in _results if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
+        st.caption(f"{len(_results)} results for {label} (last 7 days)")
+        for i,t in enumerate(sorted(_results,key=get_imp,reverse=True)[:6],1):
+            render_post(t,i,MANTLE_GREEN,is_user=True)
+
+    st.markdown("---",unsafe_allow_html=True)
+    st.markdown('<div class="search-note">⚡ Mentions limited to last 7 days. Official posts use selected date range.</div>',unsafe_allow_html=True)
 
     start,end,period=date_controls("t2")
     start_iso,end_iso=iso_range(start,end)
@@ -514,7 +543,7 @@ def tab_competitive(token):
                                      hovertemplate=f"{name}: %{{y:,}}<extra></extra>"))
     fig.update_layout(**BASE_LAYOUT,height=280,xaxis=AXIS,yaxis=AXIS,
                       title=dict(text=f"Views by {period} — all chains",
-                                 font=dict(size=13,color=MANTLE_TEXT,weight=700),x=0))
+                                 font=dict(size=13,color="#E0F5EC"),x=0))
     st.plotly_chart(fig,use_container_width=True)
 
     # Top 3 official posts
@@ -566,32 +595,18 @@ def tab_competitive(token):
     nfig.update_layout(**BASE_LAYOUT,barmode="group",height=260,
                        xaxis=AXIS,yaxis=dict(**AXIS,ticksuffix="%"),
                        title=dict(text="Narrative distribution % by chain",
-                                  font=dict(size=13,color=MANTLE_TEXT,weight=700),x=0))
+                                  font=dict(size=13,color="#E0F5EC"),x=0))
     st.plotly_chart(nfig,use_container_width=True)
 
-    # Keyword search
-    st.markdown('<div class="section-title">Keyword Search — Across All Chains</div>',unsafe_allow_html=True)
-    st.markdown('<div class="search-note">⚡ Limited to last 7 days</div>',unsafe_allow_html=True)
-    kw_c1,kw_c2=st.columns([4,1])
-    with kw_c1:
-        kw=st.text_input("",placeholder="e.g. RWA, institutional, partnership, airdrop…",
-                          key="t2_kw",label_visibility="collapsed")
-    with kw_c2:
-        run_kw=st.button("Search",key="t2_kw_btn",use_container_width=True)
-    if kw and run_kw:
-        q=f'"{kw}" (Mantle OR Solana OR "Base chain") (blockchain OR crypto OR web3) -is:retweet lang:en'
-        with st.spinner(f"Searching '{kw}'…"):
-            results=search_tweets(q,token,si7,ei7,max_results=30)
-        st.caption(f"{len(results)} results for **{kw}**")
-        for i,t in enumerate(sorted(results,key=get_imp,reverse=True)[:6],1):
-            render_post(t,i,MANTLE_GREEN,is_user=True)
+
 
 # ── TAB 3: RESEARCH ──────────────────────────────────────────────────────────
 def tab_research(token):
     st.markdown('<div class="tab-title">Industry Research — Notable Reads</div>',unsafe_allow_html=True)
-    st.markdown('<div class="search-note">⚡ Surfaces high-quality research, threads & analysis from CT — last 7 days</div>',unsafe_allow_html=True)
 
-    # Keyword filter
+    # Keyword search at top
+    st.markdown('<div class="section-title">🔍 Keyword Search</div>',unsafe_allow_html=True)
+    st.markdown('<div class="search-note">⚡ Surfaces research, threads & analysis from CT — last 7 days</div>',unsafe_allow_html=True)
     kw_c1,kw_c2=st.columns([4,1])
     with kw_c1:
         kw=st.text_input("",placeholder="Filter by topic — e.g. RWA, L2, DeFi, institutional, Mantle…",
@@ -603,9 +618,9 @@ def tab_research(token):
 
     # Research-focused queries — long-form threads, analysis, alpha
     if kw:
-        q=f'"{kw}" (blockchain OR crypto OR web3 OR defi OR L2) (research OR analysis OR thread OR report OR study OR alpha OR insight) -is:retweet lang:en min_faves:50'
+        q=f'("{kw}" OR #{kw}) (blockchain OR crypto OR web3 OR defi OR L2) (research OR analysis OR thread OR report OR alpha OR insight) -is:retweet lang:en min_faves:20'
     else:
-        q='(blockchain OR crypto OR defi OR L2 OR RWA) (research OR analysis OR thread OR report OR alpha OR insight OR "deep dive") -is:retweet lang:en min_faves:100'
+        q='(blockchain OR crypto OR defi OR L2 OR RWA) (research OR analysis OR thread OR "deep dive" OR alpha OR insight) -is:retweet lang:en min_faves:50'
 
     with st.spinner("Fetching research & analysis posts…"):
         posts=search_tweets(q,token,si,ei,max_results=100)
@@ -642,7 +657,7 @@ def tab_research(token):
         fb.update_layout(**bl,height=200,showlegend=False,
                          xaxis=AXIS,yaxis=AXIS,
                          title=dict(text="Research posts by topic",
-                                    font=dict(size=13,color=MANTLE_TEXT,weight=700),x=0))
+                                    font=dict(size=13,color="#E0F5EC"),x=0))
         st.plotly_chart(fb,use_container_width=True)
 
     st.markdown('<div class="section-title">Top Research & Analysis Posts</div>',unsafe_allow_html=True)
