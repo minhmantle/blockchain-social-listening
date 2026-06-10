@@ -12,7 +12,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Mantle brand colors
 MANTLE_GREEN   = "#00D395"
 MANTLE_DARK    = "#0A1A0F"
 MANTLE_SURFACE = "#0D1F15"
@@ -34,70 +33,27 @@ html,body,[class*="css"]{{font-family:'Inter',sans-serif;}}
 .main .block-container{{padding:1.5rem 2rem 3rem;max-width:1400px;}}
 #MainMenu,footer,header{{visibility:hidden;}}
 section[data-testid="stSidebar"]{{display:none;}}
-
-.stTabs [data-baseweb="tab-list"]{{
-    gap:4px;background:{MANTLE_SURFACE};
-    border-bottom:1px solid {MANTLE_BORDER};padding:0 4px;
-}}
-.stTabs [data-baseweb="tab"]{{
-    background:transparent;border-radius:6px 6px 0 0;
-    color:{MANTLE_MUTED};font-size:13px;font-weight:600;
-    padding:10px 22px;border:none;letter-spacing:0.02em;
-}}
-.stTabs [aria-selected="true"]{{
-    background:{MANTLE_SURFACE} !important;color:{MANTLE_GREEN} !important;
-    border-bottom:2px solid {MANTLE_GREEN} !important;
-}}
-
-.kpi-card{{
-    background:{MANTLE_SURFACE};border:1px solid {MANTLE_BORDER};
-    border-radius:12px;padding:18px 20px;
-}}
-.kpi-label{{
-    font-size:11px;color:{MANTLE_MUTED};text-transform:uppercase;
-    letter-spacing:0.1em;margin-bottom:8px;font-weight:600;
-}}
+.stTabs [data-baseweb="tab-list"]{{gap:4px;background:{MANTLE_SURFACE};border-bottom:1px solid {MANTLE_BORDER};padding:0 4px;}}
+.stTabs [data-baseweb="tab"]{{background:transparent;border-radius:6px 6px 0 0;color:{MANTLE_MUTED};font-size:13px;font-weight:600;padding:10px 22px;border:none;letter-spacing:0.02em;}}
+.stTabs [aria-selected="true"]{{background:{MANTLE_SURFACE} !important;color:{MANTLE_GREEN} !important;border-bottom:2px solid {MANTLE_GREEN} !important;}}
+.kpi-card{{background:{MANTLE_SURFACE};border:1px solid {MANTLE_BORDER};border-radius:12px;padding:18px 20px;}}
+.kpi-label{{font-size:11px;color:{MANTLE_MUTED};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;font-weight:600;}}
 .kpi-value{{font-size:26px;font-weight:800;color:#fff;letter-spacing:-0.5px;}}
 .kpi-delta-up{{font-size:12px;color:{MANTLE_GREEN};margin-top:5px;font-weight:500;}}
 .kpi-delta-dn{{font-size:12px;color:#f87171;margin-top:5px;font-weight:500;}}
 .kpi-neutral{{font-size:12px;color:{MANTLE_MUTED};margin-top:5px;}}
-
-.post-card{{
-    background:{MANTLE_SURFACE};border:1px solid {MANTLE_BORDER};
-    border-radius:10px;padding:16px;margin-bottom:10px;
-}}
+.post-card{{background:{MANTLE_SURFACE};border:1px solid {MANTLE_BORDER};border-radius:10px;padding:16px;margin-bottom:10px;}}
 .post-card:hover{{border-color:{MANTLE_GREEN}44;}}
 .post-handle{{font-size:13px;font-weight:700;color:{MANTLE_TEXT};}}
 .post-meta{{font-size:11px;color:{MANTLE_MUTED};}}
 .post-text{{font-size:13px;color:#aaa;line-height:1.55;margin:8px 0;}}
-.narrative-pill{{
-    display:inline-block;font-size:10px;padding:2px 8px;
-    border-radius:99px;margin:2px;font-weight:600;
-}}
-.section-title{{
-    font-size:13px;font-weight:800;color:{MANTLE_TEXT};
-    text-transform:uppercase;letter-spacing:0.12em;
-    margin:12px 0 10px;border-bottom:1px solid {MANTLE_BORDER};
-    padding-bottom:8px;
-}}
-.tab-title{{
-    font-size:22px;font-weight:800;color:#fff;
-    letter-spacing:-0.3px;margin-bottom:10px;
-}}
-.header-bar{{
-    display:flex;align-items:center;justify-content:space-between;
-    margin-bottom:1.5rem;padding-bottom:1rem;
-    border-bottom:1px solid {MANTLE_BORDER};
-}}
-.live-pill{{
-    background:#0A2E14;color:{MANTLE_GREEN};border:1px solid #1A5E2A;
-    padding:4px 12px;border-radius:99px;font-size:11px;font-weight:600;
-}}
-.search-note{{
-    font-size:11px;color:{MANTLE_MUTED};
-    background:{MANTLE_SURFACE};border:1px solid {MANTLE_BORDER};
-    border-radius:6px;padding:6px 12px;margin-bottom:6px;
-}}
+.narrative-pill{{display:inline-block;font-size:10px;padding:2px 8px;border-radius:99px;margin:2px;font-weight:600;}}
+.section-title{{font-size:13px;font-weight:800;color:{MANTLE_TEXT};text-transform:uppercase;letter-spacing:0.12em;margin:12px 0 10px;border-bottom:1px solid {MANTLE_BORDER};padding-bottom:8px;}}
+.tab-title{{font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.3px;margin-bottom:10px;}}
+.header-bar{{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid {MANTLE_BORDER};}}
+.live-pill{{background:#0A2E14;color:{MANTLE_GREEN};border:1px solid #1A5E2A;padding:4px 12px;border-radius:99px;font-size:11px;font-weight:600;}}
+.search-note{{font-size:11px;color:{MANTLE_MUTED};background:{MANTLE_SURFACE};border:1px solid {MANTLE_BORDER};border-radius:6px;padding:6px 12px;margin-bottom:6px;}}
+.kw-active{{font-size:11px;color:{MANTLE_GREEN};background:#0A2E14;border:1px solid #1A5E2A;border-radius:6px;padding:6px 12px;margin-bottom:6px;font-weight:600;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -137,13 +93,13 @@ def get_token():
 
 def hdrs(t): return {"Authorization":f"Bearer {t}"}
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def get_user(handle,token):
-    r = requests.get(f"https://api.twitter.com/2/users/by/username/{handle}",
+    r=requests.get(f"https://api.twitter.com/2/users/by/username/{handle}",
         headers=hdrs(token),params={"user.fields":"public_metrics,description"})
     return r.json().get("data",{}) if r.status_code==200 else {}
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def get_tweets(uid,token,start_iso,end_iso,max_results=100):
     params={"max_results":min(max_results,100),"start_time":start_iso,"end_time":end_iso,
             "tweet.fields":"public_metrics,created_at,text",
@@ -152,7 +108,7 @@ def get_tweets(uid,token,start_iso,end_iso,max_results=100):
     if r.status_code!=200: return []
     return r.json().get("data",[]) or []
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def search_tweets(query,token,start_iso,end_iso,max_results=50):
     params={"query":query,"max_results":min(max_results,100),
             "start_time":start_iso,"end_time":end_iso,
@@ -169,6 +125,11 @@ def search_tweets(query,token,start_iso,end_iso,max_results=50):
         t["author_handle"]=u.get("username","unknown")
         t["author_followers"]=u.get("public_metrics",{}).get("followers_count",0)
     return tweets
+
+def filter_by_kw(tweets, kw):
+    if not kw: return tweets
+    kw_lower = kw.lower()
+    return [t for t in tweets if kw_lower in t.get("text","").lower()]
 
 def fmt(n):
     if not n: return "0"
@@ -207,7 +168,7 @@ def detect_nar(text):
 
 def iso_range(s,e):
     si=datetime.combine(s,datetime.min.time()).strftime("%Y-%m-%dT%H:%M:%SZ")
-    ei=min(datetime.combine(e,datetime.max.time()),datetime.utcnow()).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ei=min(datetime.combine(e,datetime.max.time()),datetime.utcnow()-timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     return si,ei
 
 def search_iso():
@@ -237,19 +198,16 @@ def date_controls(pfx):
         st.session_state[f"{pfx}_sv"]=date.today()-timedelta(days=7)
     if f"{pfx}_ev" not in st.session_state:
         st.session_state[f"{pfx}_ev"]=date.today()
-    c1,c2,c3 = st.columns([2,2,1])
+    c1,c2,c3=st.columns([2,2,1])
     with c1:
-        start=st.date_input("From",value=st.session_state[f"{pfx}_sv"],
-                             max_value=date.today(),key=f"{pfx}_s")
+        start=st.date_input("From",value=st.session_state[f"{pfx}_sv"],max_value=date.today(),key=f"{pfx}_s")
         st.session_state[f"{pfx}_sv"]=start
     with c2:
-        end=st.date_input("To",value=st.session_state[f"{pfx}_ev"],
-                           max_value=date.today(),key=f"{pfx}_e")
+        end=st.date_input("To",value=st.session_state[f"{pfx}_ev"],max_value=date.today(),key=f"{pfx}_e")
         st.session_state[f"{pfx}_ev"]=end
     with c3:
         st.markdown("<div style='height:28px'></div>",unsafe_allow_html=True)
-        period=st.selectbox("Group by",["Day","Week","Month"],
-                             key=f"{pfx}_p",label_visibility="collapsed")
+        period=st.selectbox("Group by",["Day","Week","Month"],key=f"{pfx}_p",label_visibility="collapsed")
     return start,end,period
 
 def kpi(col,label,value,delta=None,sub=None,color=MANTLE_GREEN):
@@ -286,9 +244,7 @@ def render_post(t,rank,color,chain_name=None,is_user=False):
     ago=time_ago(t.get("created_at",""))
     narrs=detect_nar(text)
     badge=f'<span class="narrative-pill" style="background:{color}22;color:{color};border:1px solid {color}44;font-size:10px;padding:2px 8px;border-radius:99px">{chain_name}</span>' if chain_name else ""
-    pills=" ".join([
-        f'<span class="narrative-pill" style="background:{NARRATIVE_COLORS.get(n,"#333")}22;color:{NARRATIVE_COLORS.get(n,"#888")};border:1px solid {NARRATIVE_COLORS.get(n,"#333")}33">{n}</span>'
-        for n in narrs])
+    pills=" ".join([f'<span class="narrative-pill" style="background:{NARRATIVE_COLORS.get(n,"#333")}22;color:{NARRATIVE_COLORS.get(n,"#888")};border:1px solid {NARRATIVE_COLORS.get(n,"#333")}33">{n}</span>' for n in narrs])
     fstr=f" · {fmt(followers)} followers" if followers else ""
     st.markdown(f"""
     <div class="post-card">
@@ -315,46 +271,38 @@ def render_post(t,rank,color,chain_name=None,is_user=False):
           ↺ {fmt(m.get("retweet_count",0))} &nbsp;·&nbsp;
           💬 {fmt(m.get("reply_count",0))}
         </div>
-        <a href="{link}" target="_blank" style="font-size:11px;color:{color};
-           text-decoration:none;padding:4px 12px;border:1px solid {color}44;
-           border-radius:6px;white-space:nowrap;background:{color}11;font-weight:600">
-          View ↗
-        </a>
+        <a href="{link}" target="_blank" style="font-size:11px;color:{color};text-decoration:none;padding:4px 12px;border:1px solid {color}44;border-radius:6px;white-space:nowrap;background:{color}11;font-weight:600">View ↗</a>
       </div>
     </div>""",unsafe_allow_html=True)
 
-# ── TAB 1: MANTLE ────────────────────────────────────────────────────────────
+def kw_bar(key_input, key_btn, key_clear, placeholder):
+    """Keyword search bar — returns (kw, active)"""
+    c1,c2,c3=st.columns([4,1,1])
+    with c1:
+        kw=st.text_input("Keyword",placeholder=placeholder,key=key_input,label_visibility="collapsed")
+    with c2:
+        search=st.button("Search",key=key_btn,use_container_width=True)
+    with c3:
+        clear=st.button("Clear",key=key_clear,use_container_width=True)
+    # persist active keyword in session state
+    sk=f"{key_input}_active"
+    if search and kw:
+        st.session_state[sk]=kw
+    if clear:
+        st.session_state[sk]=""
+    active=st.session_state.get(sk,"")
+    if active:
+        st.markdown(f'<div class="kw-active">🔍 Filtering by: <b>{active}</b> — metrics & posts below reflect this keyword only</div>',unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="search-note">💡 Enter a keyword to filter the entire dashboard</div>',unsafe_allow_html=True)
+    return active
+
+# ── TAB 1 ────────────────────────────────────────────────────────────────────
 def tab_mantle(token):
     st.markdown('<div class="tab-title">Mantle — Performance Deep Dive</div>',unsafe_allow_html=True)
-    st.markdown('<div class="section-title">🔍 Keyword Search</div>',unsafe_allow_html=True)
-    st.markdown('<div class="search-note">⚡ Search is limited to the last 7 days (X API constraint)</div>',unsafe_allow_html=True)
-    kw_col1,kw_col2=st.columns([4,1])
-    with kw_col1:
-        kw=st.text_input("",placeholder="Search keyword in Mantle context — e.g. RWA, mETH, DeFi, institutional…",
-                          key="t1_kw",label_visibility="collapsed")
-    with kw_col2:
-        run_search=st.button("Search",key="t1_kw_btn",use_container_width=True)
+    st.markdown('<div class="section-title">🔍 Keyword Filter</div>',unsafe_allow_html=True)
+    kw=kw_bar("t1_kw","t1_kw_btn","t1_kw_clr","Filter by keyword — e.g. RWA, mETH, DeFi, hackathon…")
 
-    if run_search:
-        si,ei=search_iso()
-        if kw:
-            q=f'(#{kw} OR "{kw}") (#Mantle OR @Mantle_Official OR "Mantle blockchain" OR "Mantle network") (crypto OR blockchain OR web3) -is:retweet lang:en'
-            label=f"**{kw}** in Mantle context"
-        else:
-            q='(#Mantle OR @Mantle_Official OR "Mantle network") (crypto OR blockchain OR web3) -is:retweet lang:en'
-            label="all Mantle mentions"
-        with st.spinner("Searching…"):
-            results=search_tweets(q,token,si,ei,max_results=20)
-        results=[t for t in results if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
-        st.caption(f"{len(results)} results for {label} (last 7 days)")
-        if results:
-            sr=sorted(results,key=get_imp,reverse=True)
-            for i,t in enumerate(sr[:5],1):
-                render_post(t,i,MANTLE_GREEN,is_user=True)
-        else:
-            st.info("No results found. Try a broader keyword.")
-
-    st.markdown("---",unsafe_allow_html=True)
     st.markdown('<div class="section-title">Performance Overview</div>',unsafe_allow_html=True)
     start,end,period=date_controls("t1")
     start_iso,end_iso=iso_range(start,end)
@@ -364,24 +312,24 @@ def tab_mantle(token):
     with st.spinner("Fetching Mantle data…"):
         user=get_user("Mantle_Official",token)
         uid=user.get("id","")
-        tweets=get_tweets(uid,token,start_iso,end_iso) if uid else []
-        prev_tw=get_tweets(uid,token,prev_s_iso,prev_e_iso) if uid else []
+        all_tweets=get_tweets(uid,token,start_iso,end_iso) if uid else []
+        all_prev=get_tweets(uid,token,prev_s_iso,prev_e_iso) if uid else []
+
+    # apply keyword filter
+    tweets=filter_by_kw(all_tweets,kw)
+    prev_tw=filter_by_kw(all_prev,kw)
 
     followers=user.get("public_metrics",{}).get("followers_count",0) or 0
     total_eng=sum(eng(t.get("public_metrics",{})) for t in tweets)
     prev_eng=sum(eng(t.get("public_metrics",{})) for t in prev_tw)
     total_likes=sum(t.get("public_metrics",{}).get("like_count",0) or 0 for t in tweets)
     total_rts=sum(t.get("public_metrics",{}).get("retweet_count",0) or 0 for t in tweets)
-    total_imps=sum(t.get("public_metrics",{}).get("impression_count",0) or 0 for t in tweets)
     total_views=sum(get_imp(t) for t in tweets)
     post_count=len(tweets)
     prev_posts=len(prev_tw)
-    eng_delta=((total_eng-prev_eng)/prev_eng*100) if prev_eng else 0
     post_delta=((post_count-prev_posts)/prev_posts*100) if prev_posts else 0
-    view_delta=0
-    if prev_tw:
-        prev_views=sum(get_imp(t) for t in prev_tw)
-        view_delta=((total_views-prev_views)/prev_views*100) if prev_views else 0
+    prev_views=sum(get_imp(t) for t in prev_tw)
+    view_delta=((total_views-prev_views)/prev_views*100) if prev_views else 0
     eng_rate=round(total_eng/total_views*100,2) if total_views else 0
 
     k1,k2,k3,k4,k5=st.columns(5)
@@ -403,16 +351,16 @@ def tab_mantle(token):
                                  mode="lines+markers",yaxis="y2",
                                  line=dict(color="#f59e0b",width=2),marker=dict(size=5),
                                  hovertemplate="%{x}: %{y:,}<extra>Engagement</extra>"))
+        title_kw=f' · keyword: "{kw}"' if kw else ""
         fig.update_layout(**BASE_LAYOUT,height=280,
                           xaxis=AXIS,
                           yaxis=dict(**AXIS,title="Views"),
                           yaxis2=dict(title=dict(text="Engagement",font=dict(color="#f59e0b")),overlaying="y",side="right",
                                       showgrid=False,zeroline=False,tickfont=dict(color="#f59e0b")),
-                          title=dict(text=f"Views & Engagement by {period} — @Mantle_Official",
+                          title=dict(text=f"Views & Engagement by {period} — @Mantle_Official{title_kw}",
                                      font=dict(size=13,color="#E0F5EC"),x=0))
         st.plotly_chart(fig,use_container_width=True)
 
-    # Narrative breakdown
     all_nar=[]
     for t in tweets: all_nar.extend(detect_nar(t.get("text","")))
     nar_counts=Counter(all_nar)
@@ -445,45 +393,19 @@ def tab_mantle(token):
                   </div>
                 </div>""",unsafe_allow_html=True)
 
-    # Top 5 posts by views
     sorted_tw=sorted(tweets,key=get_imp,reverse=True)
     st.markdown('<div class="section-title">Top 5 Posts by Views — Mantle Official</div>',unsafe_allow_html=True)
     if sorted_tw:
         for i,t in enumerate(sorted_tw[:5],1):
             render_post(t,i,MANTLE_GREEN,chain_name="Mantle",is_user=False)
     else:
-        st.info("No posts found for this time range.")
+        st.info("No posts found for this time range." + (f' Try removing the keyword filter "{kw}".' if kw else ""))
 
-# ── TAB 2: COMPETITIVE ───────────────────────────────────────────────────────
+# ── TAB 2 ────────────────────────────────────────────────────────────────────
 def tab_competitive(token):
     st.markdown('<div class="tab-title">Competitive Analysis — Mantle vs Solana vs Base</div>',unsafe_allow_html=True)
-
-    # Keyword search at top
-    st.markdown('<div class="section-title">🔍 Keyword Search — Across All Chains</div>',unsafe_allow_html=True)
-    st.markdown('<div class="search-note">⚡ Limited to last 7 days (X API constraint)</div>',unsafe_allow_html=True)
-    kw_c1,kw_c2=st.columns([4,1])
-    with kw_c1:
-        kw_top=st.text_input("",placeholder="e.g. RWA, institutional, partnership, airdrop…",
-                              key="t2_kw_top",label_visibility="collapsed")
-    with kw_c2:
-        run_kw_top=st.button("Search",key="t2_kw_top_btn",use_container_width=True)
-    if run_kw_top:
-        _si7,_ei7=search_iso()
-        if kw_top:
-            q=f'"{kw_top}" (Mantle OR Solana OR "Base chain") (blockchain OR crypto OR web3) -is:retweet lang:en'
-            label=f"**{kw_top}**"
-        else:
-            q='(Mantle OR Solana OR "Base chain") (blockchain OR crypto OR web3 OR defi) -is:retweet lang:en'
-            label="all chains (market-wide)"
-        with st.spinner("Searching…"):
-            _results=search_tweets(q,token,_si7,_ei7,max_results=30)
-        _results=[t for t in _results if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
-        st.caption(f"{len(_results)} results for {label} (last 7 days)")
-        for i,t in enumerate(sorted(_results,key=get_imp,reverse=True)[:6],1):
-            render_post(t,i,MANTLE_GREEN,is_user=True)
-
-    st.markdown("---",unsafe_allow_html=True)
-    st.markdown('<div class="search-note">⚡ Mentions limited to last 7 days. Official posts use selected date range.</div>',unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🔍 Keyword Filter</div>',unsafe_allow_html=True)
+    kw=kw_bar("t2_kw","t2_kw_btn","t2_kw_clr","Filter all chains by keyword — e.g. RWA, institutional, airdrop…")
 
     start,end,period=date_controls("t2")
     start_iso,end_iso=iso_range(start,end)
@@ -497,11 +419,12 @@ def tab_competitive(token):
             handle={"Mantle":"Mantle_Official","Solana":"solana","Base":"base"}[name]
             u=get_user(handle,token)
             uid=u.get("id","")
-            tw=get_tweets(uid,token,start_iso,end_iso) if uid else []
-            ptw=get_tweets(uid,token,prev_s_iso,prev_e_iso) if uid else []
+            raw_tw=get_tweets(uid,token,start_iso,end_iso) if uid else []
+            raw_prev=get_tweets(uid,token,prev_s_iso,prev_e_iso) if uid else []
+            tw=filter_by_kw(raw_tw,kw)
+            ptw=filter_by_kw(raw_prev,kw)
             all_data[name]={"user":u,"tweets":tw,"prev":ptw,"color":color,"handle":handle}
 
-    # KPI snapshot
     st.markdown('<div class="section-title">Performance Snapshot</div>',unsafe_allow_html=True)
     cols=st.columns(len(CHAIN_COLORS))
     for col,(name,d) in zip(cols,all_data.items()):
@@ -514,8 +437,7 @@ def tab_competitive(token):
         dcls=f"color:{MANTLE_GREEN}" if delta>=0 else "color:#f87171"
         col.markdown(f"""
         <div class="kpi-card">
-          <div style="font-size:12px;font-weight:800;color:{color};text-transform:uppercase;
-               letter-spacing:.1em;margin-bottom:12px">{name}</div>
+          <div style="font-size:12px;font-weight:800;color:{color};text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">{name}</div>
           <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:2px">Followers</div>
           <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:10px">{fmt(followers)}</div>
           <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:2px">Total views</div>
@@ -526,7 +448,6 @@ def tab_competitive(token):
 
     st.markdown("<div style='margin-top:16px'></div>",unsafe_allow_html=True)
 
-    # Views line chart
     fig=go.Figure()
     for name,d in all_data.items():
         df=group_by(d["tweets"],period)
@@ -535,12 +456,12 @@ def tab_competitive(token):
                                      mode="lines+markers",
                                      line=dict(color=d["color"],width=2),marker=dict(size=5),
                                      hovertemplate=f"{name}: %{{y:,}}<extra></extra>"))
+    title_kw=f' · keyword: "{kw}"' if kw else ""
     fig.update_layout(**BASE_LAYOUT,height=280,xaxis=AXIS,yaxis=AXIS,
-                      title=dict(text=f"Views by {period} — all chains",
+                      title=dict(text=f"Views by {period} — all chains{title_kw}",
                                  font=dict(size=13,color="#E0F5EC"),x=0))
     st.plotly_chart(fig,use_container_width=True)
 
-    # Top 3 official posts
     st.markdown('<div class="section-title">Top 3 Official Posts by Views</div>',unsafe_allow_html=True)
     pcols=st.columns(len(CHAIN_COLORS))
     for col,(name,d) in zip(pcols,all_data.items()):
@@ -553,7 +474,6 @@ def tab_competitive(token):
             else:
                 st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>',unsafe_allow_html=True)
 
-    # User/KOL mentions
     st.markdown('<div class="section-title">Top User / KOL Mentions by Views (last 7 days)</div>',unsafe_allow_html=True)
     mcols=st.columns(len(CHAIN_COLORS))
     for col,(name,d) in zip(mcols,all_data.items()):
@@ -565,6 +485,7 @@ def tab_competitive(token):
             q=f'(#Mantle OR "Mantle network" OR "Mantle blockchain" OR mETH) (crypto OR blockchain OR defi OR web3) -from:Mantle_Official -is:retweet lang:en min_faves:20'
         with st.spinner(f"Fetching {name} mentions…"):
             mentions=search_tweets(q,token,si7,ei7,max_results=100)
+        mentions=filter_by_kw(mentions,kw)
         mentions=[t for t in mentions if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
         sm=sorted(mentions,key=get_imp,reverse=True)
         with col:
@@ -575,7 +496,6 @@ def tab_competitive(token):
             else:
                 st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No mentions found</div>',unsafe_allow_html=True)
 
-    # Narrative comparison
     st.markdown('<div class="section-title">Narrative Distribution by Chain</div>',unsafe_allow_html=True)
     nfig=go.Figure()
     for name,d in all_data.items():
@@ -594,76 +514,87 @@ def tab_competitive(token):
                                   font=dict(size=13,color="#E0F5EC"),x=0))
     st.plotly_chart(nfig,use_container_width=True)
 
+# Research accounts — hidden from UI
+RESEARCH_KW = [
+    "research","analysis","report","thread","deep dive","breakdown",
+    "insight","data","metrics","onchain","on-chain","study","findings",
+    "trends","outlook","review","alpha","thesis","framework","explained",
+    "how","why","what","chart","graph","stat","number","billion","million",
+    "growth","decline","increase","decrease","market","protocol","ecosystem",
+]
+RESEARCH_ACCOUNTS = [
+    "a16zcrypto",
+    "MessariCrypto",
+    "TheBlockCo",
+    "Delphi_Digital",
+    "glassnode",
+]
 
-
-# ── TAB 3: RESEARCH ──────────────────────────────────────────────────────────
+# ── TAB 3 ────────────────────────────────────────────────────────────────────
 def tab_research(token):
     st.markdown('<div class="tab-title">Industry Research — Notable Reads</div>',unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🔍 Keyword Filter</div>',unsafe_allow_html=True)
+    kw=kw_bar("t3_kw","t3_kw_btn","t3_kw_clr","Filter research by topic — e.g. RWA, L2, DeFi, Mantle…")
 
-    # Keyword search at top
-    st.markdown('<div class="section-title">🔍 Keyword Search</div>',unsafe_allow_html=True)
-    st.markdown('<div class="search-note">⚡ Surfaces research, threads & analysis from CT — last 7 days</div>',unsafe_allow_html=True)
-    kw_c1,kw_c2=st.columns([4,1])
-    with kw_c1:
-        kw=st.text_input("",placeholder="Filter by topic — e.g. RWA, L2, DeFi, institutional, Mantle…",
-                          key="t3_kw",label_visibility="collapsed")
-    with kw_c2:
-        run=st.button("Search",key="t3_btn",use_container_width=True)
+    start,end,period=date_controls("t3")
+    start_iso,end_iso=iso_range(start,end)
 
-    si,ei=search_iso()
+    # Fetch from all research accounts
+    all_posts=[]
+    with st.spinner("Fetching research posts from all accounts…"):
+        for handle in RESEARCH_ACCOUNTS:
+            u=get_user(handle,token)
+            uid=u.get("id","")
+            if not uid: continue
+            tw=get_tweets(uid,token,start_iso,end_iso,max_results=100)
+            # tag each tweet with author info
+            for t in tw:
+                t["author_handle"]=handle
+                t["author_name"]=u.get("name",handle)
+                t["author_followers"]=u.get("public_metrics",{}).get("followers_count",0)
+            all_posts.extend(tw)
 
-    # Research-focused queries — long-form threads, analysis, alpha
-    if kw:
-        q=f'("{kw}" OR #{kw}) (blockchain OR crypto OR web3 OR defi OR L2) (research OR analysis OR thread OR report OR alpha OR insight) -is:retweet lang:en min_faves:20'
-    else:
-        q='(blockchain OR crypto OR defi OR L2 OR RWA) (research OR analysis OR thread OR "deep dive" OR alpha OR insight) -is:retweet lang:en min_faves:50'
+    # apply keyword filter
+    filtered=filter_by_kw(all_posts,kw)
+    # keep only research/article content
+    filtered=[p for p in filtered if any(k in p.get("text","").lower() for k in RESEARCH_KW)]
+    sorted_posts=sorted(filtered,key=get_imp,reverse=True)
 
-    with st.spinner("Fetching research & analysis posts…"):
-        posts=search_tweets(q,token,si,ei,max_results=100)
+    kw_label=f' · keyword: "{kw}"' if kw else ""
+    st.caption(f"Found {len(filtered)} posts from {len(RESEARCH_ACCOUNTS)} research accounts{kw_label}")
 
-    if not posts:
-        # fallback
-        q2='(blockchain OR crypto OR defi) (research OR analysis OR thread) -is:retweet lang:en min_faves:20'
-        with st.spinner("Retrying…"):
-            posts=search_tweets(q2,token,si,ei,max_results=50)
-
-    posts=[p for p in posts if any(k in p.get("text","").lower() for k in BLOCKCHAIN_KW)]
-    sorted_posts=sorted(posts,key=get_imp,reverse=True)
-
-    st.caption(f"Found {len(posts)} research posts · Last 7 days")
-
-    if not sorted_posts:
-        st.warning("No research posts found. Try a different keyword or check back later.")
+    if not filtered:
+        st.warning("No posts found. Try adjusting the date range or keyword.")
         return
 
-    # Narrative breakdown of research posts
+    # Narrative distribution chart — all posts (not just top 15)
     all_nar=[]
-    for p in posts: all_nar.extend(detect_nar(p.get("text","")))
+    for p in filtered: all_nar.extend(detect_nar(p.get("text","")))
     nar_counts=Counter(all_nar)
     nar_counts.pop("Other",None)
 
     if nar_counts:
-        st.markdown('<div class="section-title">Research Topics Distribution</div>',unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Narrative Distribution — All Research Posts</div>',unsafe_allow_html=True)
         sn=sorted(nar_counts.items(),key=lambda x:-x[1])
+        total_n=sum(v for _,v in sn) or 1
         fb=go.Figure(go.Bar(
-            x=[n for n,_ in sn],y=[c for _,c in sn],
+            x=[n for n,_ in sn],
+            y=[c/total_n*100 for _,c in sn],
             marker_color=[NARRATIVE_COLORS.get(n,"#666") for n,_ in sn],
-            hovertemplate="%{x}: %{y} posts<extra></extra>"))
-        bl={k:v for k,v in BASE_LAYOUT.items()}
-        fb.update_layout(**bl,height=200,showlegend=False,
-                         xaxis=AXIS,yaxis=AXIS,
-                         title=dict(text="Research posts by topic",
+            text=[f"{c/total_n*100:.0f}%" for _,c in sn],
+            textposition="outside",
+            hovertemplate="%{x}: %{y:.1f}% (%{customdata} posts)<extra></extra>",
+            customdata=[c for _,c in sn]))
+        fb.update_layout(**BASE_LAYOUT,height=240,showlegend=False,
+                         xaxis=AXIS,yaxis=dict(**AXIS,ticksuffix="%"),
+                         title=dict(text=f"Narrative distribution — {len(filtered)} posts{kw_label}",
                                     font=dict(size=13,color="#E0F5EC"),x=0))
         st.plotly_chart(fb,use_container_width=True)
 
-    st.markdown('<div class="section-title">Top Research & Analysis Posts</div>',unsafe_allow_html=True)
-    for i,t in enumerate(sorted_posts[:10],1):
-        tl=t.get("text","").lower()
-        if "mantle" in tl: c,cn=MANTLE_GREEN,"Mantle"
-        elif "solana" in tl: c,cn=CHAIN_COLORS["Solana"],"Solana"
-        elif "base" in tl and any(k in tl for k in ["blockchain","l2","onchain","coinbase"]): c,cn=CHAIN_COLORS["Base"],"Base"
-        else: c,cn="#6b7280",None
-        render_post(t,i,c,chain_name=cn,is_user=True)
+    # Top 15 posts by views
+    st.markdown('<div class="section-title">Top 15 Research Posts by Views</div>',unsafe_allow_html=True)
+    for i,t in enumerate(sorted_posts[:15],1):
+        render_post(t,i,"#A0C8B0",is_user=True)
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
@@ -672,12 +603,8 @@ def main():
     <div class="header-bar">
       <div style="display:flex;align-items:center;gap:14px">
         <div>
-          <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.5px">
-            Mantle Social Intelligence
-          </div>
-          <div style="font-size:12px;color:{MANTLE_MUTED};margin-top:2px;font-weight:500">
-            Mantle · Solana · Base &nbsp;·&nbsp; X API v2
-          </div>
+          <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-0.5px">Mantle Social Intelligence</div>
+          <div style="font-size:12px;color:{MANTLE_MUTED};margin-top:2px;font-weight:500">Mantle · Solana · Base &nbsp;·&nbsp; X API v2</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
