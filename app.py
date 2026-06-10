@@ -149,8 +149,8 @@ def get_tweets(uid,token,start_iso,end_iso,max_results=100):
             "tweet.fields":"public_metrics,non_public_metrics,organic_metrics,created_at,text",
             "exclude":"retweets,replies"}
     r=requests.get(f"https://api.twitter.com/2/users/{uid}/tweets",headers=hdrs(token),params=params)
+    st.write(f"DEBUG get_tweets uid={uid} status={r.status_code} response={r.text[:300]}")
     if r.status_code not in (200,):
-        # fallback: retry without restricted fields
         params["tweet.fields"]="public_metrics,created_at,text"
         r=requests.get(f"https://api.twitter.com/2/users/{uid}/tweets",headers=hdrs(token),params=params)
     if r.status_code!=200: return []
