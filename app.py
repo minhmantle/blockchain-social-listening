@@ -455,8 +455,10 @@ def tab_mantle(token):
                         placeholder="Type and press Enter", key="t1_kw")
     if kw:
         q = f'("{kw}" (@Mantle_Official OR #Mantle) (blockchain OR crypto OR web3)) OR ("{kw}" #Mantle) -is:retweet lang:en'
+        kw_end   = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        kw_start = (datetime.utcnow() - timedelta(days=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
         with st.spinner(f"Searching '{kw}'…"):
-            results = search_tweets(q, token, start_iso, end_iso, max_results=20)
+            results = search_tweets(q, token, kw_start, kw_end, max_results=20)
         st.caption(f"{len(results)} results for **{kw}**")
         for i, t in enumerate(sorted(results, key=lambda t: eng(t.get("public_metrics",{})), reverse=True)[:5], 1):
             render_post(t, i, color, is_user=True)
@@ -548,11 +550,14 @@ def tab_competitive(token):
         color  = d["info"]["color"]
         handle = d["info"]["handle"]
         if name == "Base":
-            q = '("@base" OR "#Base" OR "Base blockchain" OR "Base chain" OR "build on Base") (crypto OR blockchain OR web3 OR DeFi OR onchain OR L2) -from:base -is:retweet lang:en'
+            q = '"Base chain" OR "Base blockchain" OR "build on Base" (crypto OR blockchain OR web3) -from:base -is:retweet lang:en'
         else:
-            q = f'(@{handle} OR #{name}) (crypto OR blockchain OR web3 OR DeFi OR onchain) -from:{handle} -is:retweet lang:en'
+            q = f'#{name} (crypto OR blockchain OR web3) -from:{handle} -is:retweet lang:en'
+        # Search API limited to 7 days
+        search_end   = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        search_start = (datetime.utcnow() - timedelta(days=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
         with st.spinner(f"Fetching {name} mentions…"):
-            mentions = search_tweets(q, token, start_iso, end_iso, max_results=30)
+            mentions = search_tweets(q, token, search_start, search_end, max_results=30)
         mentions = [t for t in mentions if any(k in t.get("text","").lower() for k in BKCHAIN_KW)]
         sm = sorted(mentions, key=lambda t: eng(t.get("public_metrics",{})), reverse=True)
         with col:
@@ -596,8 +601,10 @@ def tab_competitive(token):
                         key="t2_kw")
     if kw:
         q = f'"{kw}" (Mantle OR Solana OR Base) (blockchain OR crypto OR web3) -is:retweet lang:en'
+        kw_end   = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        kw_start = (datetime.utcnow() - timedelta(days=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
         with st.spinner(f"Searching '{kw}'…"):
-            results = search_tweets(q, token, start_iso, end_iso, max_results=30)
+            results = search_tweets(q, token, kw_start, kw_end, max_results=30)
         st.caption(f"{len(results)} results for **{kw}**")
         for i, t in enumerate(sorted(results, key=lambda t: eng(t.get("public_metrics",{})), reverse=True)[:6], 1):
             render_post(t, i, "#7c5cbf", is_user=True)
@@ -605,25 +612,39 @@ def tab_competitive(token):
 # ── TAB 3 ────────────────────────────────────────────────────────────────────
 def tab_industry(token):
     st.markdown("### Industry Overview — Blockchain Twitter Pulse")
-    c1, c2 = st.columns([4, 1])
-    with c1:
-        start, end, _ = date_controls("t3")
-    with c2:
-        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-        kw = st.text_input("Filter by keyword", placeholder="e.g. RWA, AI…", key="t3_kw")
 
-    start_iso, end_iso = iso_range(start, end)
-    base_terms = "(blockchain OR crypto OR web3 OR DeFi OR L2 OR layer2 OR onchain)"
-    q = f'"{kw}" {base_terms} -is:retweet lang:en' if kw else \
-        f'{base_terms} (Mantle OR Solana OR Base OR Ethereum OR Arbitrum) -is:retweet lang:en'
+    # Search API capped at 7 days for pay-per-use
+    st.info("ℹ️ X API (pay-per-use) returns data from the last 7 days only. Date range is fixed.")
+
+    c1, _ = st.columns([3, 1])
+    with c1:
+        kw = st.text_input("Filter by keyword", placeholder="e.g. RWA, AI, institutional…", key="t3_kw")
+
+    # Always use last 7 days
+    end_dt   = datetime.utcnow()
+    start_dt = end_dt - timedelta(days=6)
+    start_iso = start_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_iso   = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Simple, short queries that X API accepts
+    if kw:
+        q = f'({kw}) (crypto OR blockchain OR web3) -is:retweet lang:en'
+    else:
+        q = '(Mantle OR Solana OR "Base chain") (crypto OR blockchain OR defi OR web3) -is:retweet lang:en'
 
     with st.spinner("Fetching industry data…"):
         industry = search_tweets(q, token, start_iso, end_iso, max_results=100)
 
-    st.caption(f"Analysing {len(industry)} posts")
+    if not industry:
+        # Fallback: even simpler query
+        q2 = 'blockchain crypto web3 -is:retweet lang:en'
+        with st.spinner("Retrying with broader query…"):
+            industry = search_tweets(q2, token, start_iso, end_iso, max_results=50)
+
+    st.caption(f"Analysing {len(industry)} posts · Last 7 days")
 
     if not industry:
-        st.info("No data found. Try widening the date range.")
+        st.warning("No data returned from X API. This may be a rate limit — try again in a few minutes.")
         return
 
     all_nar = []
