@@ -216,7 +216,7 @@ def iso_range(s,e):
     return si,ei
 
 def search_iso():
-    e=datetime.utcnow()
+    e=datetime.utcnow()-timedelta(seconds=30)
     s=e-timedelta(days=6)
     return s.strftime("%Y-%m-%dT%H:%M:%SZ"),e.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -567,13 +567,6 @@ def tab_competitive(token):
         else:
             q=f'#{name} (crypto OR blockchain OR web3) -from:{d["handle"]} -is:retweet lang:en'
         with st.spinner(f"Fetching {name} mentions…"):
-            params_debug={"query":q,"max_results":10,"start_time":si7,"end_time":ei7,
-                          "tweet.fields":"public_metrics,created_at,author_id,text",
-                          "expansions":"author_id","user.fields":"username,name,public_metrics"}
-            r_debug=requests.get("https://api.twitter.com/2/tweets/search/recent",
-                                 headers=hdrs(token),params=params_debug)
-            if r_debug.status_code!=200:
-                st.warning(f"{name} mentions API error {r_debug.status_code}: {r_debug.text[:300]}")
             mentions=search_tweets(q,token,si7,ei7,max_results=30)
         mentions=[t for t in mentions if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
         sm=sorted(mentions,key=get_imp,reverse=True)
