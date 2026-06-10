@@ -122,7 +122,8 @@ AXIS = dict(gridcolor="#1A3320",showgrid=True,zeroline=False,color="#A0C8B0",tic
 BASE_LAYOUT = dict(
     paper_bgcolor=MANTLE_SURFACE, plot_bgcolor=MANTLE_SURFACE,
     font=dict(color="#A0C8B0",size=11,family="Inter"),
-    legend=dict(bgcolor="rgba(0,0,0,0)",font_size=11),
+    legend=dict(bgcolor="rgba(0,0,0,0)",font=dict(size=13,color="#E0F5EC",family="Inter"),
+                itemsizing="constant",tracegroupgap=4),
     hovermode="x unified",
     margin=dict(l=10,r=10,t=36,b=10),
 )
@@ -566,6 +567,13 @@ def tab_competitive(token):
         else:
             q=f'#{name} (crypto OR blockchain OR web3) -from:{d["handle"]} -is:retweet lang:en'
         with st.spinner(f"Fetching {name} mentions…"):
+            params_debug={"query":q,"max_results":10,"start_time":si7,"end_time":ei7,
+                          "tweet.fields":"public_metrics,created_at,author_id,text",
+                          "expansions":"author_id","user.fields":"username,name,public_metrics"}
+            r_debug=requests.get("https://api.twitter.com/2/tweets/search/recent",
+                                 headers=hdrs(token),params=params_debug)
+            if r_debug.status_code!=200:
+                st.warning(f"{name} mentions API error {r_debug.status_code}: {r_debug.text[:300]}")
             mentions=search_tweets(q,token,si7,ei7,max_results=30)
         mentions=[t for t in mentions if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
         sm=sorted(mentions,key=get_imp,reverse=True)
