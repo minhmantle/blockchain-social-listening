@@ -161,37 +161,21 @@ def ai_social_expert_analysis(tweets_tuple, metrics_data, anthropic_key):
             "narrative": t.get("narrative","Other")
         })
 
-    prompt = f"""You are a senior crypto social media strategist with 10+ years experience.
-Analyze @Mantle_Official's Twitter/X performance for the given period.
+    # Only send top 10 posts to keep prompt short
+    samples_str = "\n".join([f"- [{s['narrative']}] {s['text'][:120]} (views:{s['views']:,} likes:{s['likes']})" for s in samples[:10]])
 
-PERFORMANCE METRICS:
-- Total posts: {metrics_data['post_count']}
-- Total views: {metrics_data['total_views']:,}
-- Total likes: {metrics_data['total_likes']:,}
-- Total retweets: {metrics_data['total_rts']:,}
-- Engagement rate: {metrics_data['eng_rate']:.2f}%
-- Followers: {metrics_data['followers']:,}
-- vs previous period: views {metrics_data['view_delta']:+.1f}%, posts {metrics_data['post_delta']:+.1f}%
+    prompt = f"""You are a senior crypto social media strategist. Analyze @Mantle_Official's Twitter performance.
 
-NARRATIVE DISTRIBUTION:
-{metrics_data['narratives']}
+METRICS:
+- Posts: {metrics_data['post_count']} | Views: {metrics_data['total_views']:,} | Likes: {metrics_data['total_likes']:,} | Eng.rate: {metrics_data['eng_rate']:.2f}% | Followers: {metrics_data['followers']:,}
+- vs prev period: views {metrics_data['view_delta']:+.1f}%, posts {metrics_data['post_delta']:+.1f}%
+- Narratives: {metrics_data['narratives']}
 
-SAMPLE POSTS (with performance):
-{str(samples[:15])}
+TOP POSTS:
+{samples_str}
 
-Provide a professional analysis in this exact JSON format:
-{{
-  "overall_score": "Good/Average/Needs Improvement",
-  "overall_assessment": "2-3 sentences overall assessment of content performance",
-  "engagement_analysis": "2-3 sentences on whether engagement rate is healthy for this follower count and how it compares to crypto industry benchmarks",
-  "content_quality": "2-3 sentences on content quality, depth, and relevance to market trends",
-  "narrative_fit": "2-3 sentences on whether their narrative focus aligns with current market interest",
-  "strengths": ["strength 1", "strength 2", "strength 3"],
-  "weaknesses": ["weakness 1", "weakness 2", "weakness 3"],
-  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"]
-}}
-
-Be specific, data-driven, and actionable. Reference actual numbers. Respond with JSON only."""
+Return ONLY this JSON (no markdown, keep each string under 100 words):
+{{"overall_score":"Good or Average or Needs Improvement","overall_assessment":"assessment here","engagement_analysis":"analysis here","content_quality":"quality here","narrative_fit":"fit here","strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"recommendations":["r1","r2","r3"]}}"""
 
     try:
         r = requests.post(
@@ -203,7 +187,7 @@ Be specific, data-driven, and actionable. Reference actual numbers. Respond with
             },
             json={
                 "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 1000,
+                "max_tokens": 1500,
                 "messages": [{"role": "user", "content": prompt}]
             },
             timeout=30
