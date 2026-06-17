@@ -249,51 +249,6 @@ def render_social_expert_analysis(analysis):
         st.markdown(f'<div style="font-size:12px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">💡 Recommendations</div>', unsafe_allow_html=True)
         for rec in analysis.get("recommendations", []):
             st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#2e1f0a;border-radius:6px;margin-bottom:6px;line-height:1.5">• {rec}</div>', unsafe_allow_html=True)
-    """Call Claude API to summarize content themes and narratives"""
-    if not anthropic_key or not tweets_text_list:
-        return None
-    sample = tweets_text_list[:30]
-    combined = "\n---\n".join(sample)
-    prompt = f"""Analyze these {len(sample)} tweets from {chain_name}'s official account.
-
-TWEETS:
-{combined}
-
-Provide a concise analysis in this exact JSON format:
-{{
-  "main_themes": ["theme1", "theme2", "theme3"],
-  "top_narrative": "name of dominant narrative",
-  "top_narrative_reason": "1-2 sentences explaining why this narrative dominates",
-  "content_summary": "2-3 sentences summarizing overall content strategy and topics",
-  "high_attention_topic": "the specific topic/announcement that got most engagement",
-  "high_attention_reason": "1-2 sentences explaining why it resonated"
-}}
-
-Respond with JSON only, no markdown, no extra text."""
-
-    try:
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": anthropic_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 600,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=30
-        )
-        if r.status_code == 200:
-            import json, re as re2
-            raw = r.json()["content"][0]["text"].strip()
-            raw = re2.sub(r'^[^{[]*', "", raw)
-            raw = re2.sub(r'[^}\]]*$', "", raw)
-            return json.loads(raw)
-    except Exception as e:
-        return None
 
 def get_token():
     try: return st.secrets["TWITTER_BEARER_TOKEN"]
