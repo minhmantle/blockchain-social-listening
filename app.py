@@ -218,10 +218,97 @@ def time_ago(s):
     if h >= 1: return f"{h}h ago"
     return f"{d.seconds//60}m ago"
 
-def detect_nar(text):
+def detect_nar_keyword(text):
+    """Fallback keyword-based narrative detection"""
     tl = text.lower()
     found = [n for n, kws in NARRATIVES.items() if any(k in tl for k in kws)]
-    return found if found else ["Other"]
+    return found[0] if found else "Other"
+
+@st.cache_data(ttl=1800)
+def classify_narratives_batch(texts_tuple, anthropic_key):
+    """Use Claude to classify a batch of tweets into single narratives"""
+    if not anthropic_key:
+        return {}
+    texts = list(texts_tuple)
+    narrative_list = ", ".join(list(NARRATIVES.keys()) + ["Other"])
+    numbered = "\n".join([f"{i+1}. {t[:200]}" for i,t in enumerate(texts)])
+    prompt = f"""Classify each tweet into exactly ONE narrative category.
+
+Categories: {narrative_list}
+
+Definitions:
+- RWA: real world assets, tokenized bonds/treasuries, institutional yield, Ondo, USDY, OUSG, t-bills on-chain
+- DeFi: decentralized finance, DEX, lending, yield farming, liquidity, TVL, AMM
+- AI: artificial intelligence, LLM, AI agents, machine learning in crypto
+- Infrastructure: L2, rollups, ZK, scalability, bridges, validators, data availability, restaking
+- Institutional: banks, ETF, asset managers, BlackRock, TradFi adoption, regulated products
+- NFT: NFTs, digital collectibles, minting, marketplaces
+- Gaming: GameFi, play-to-earn, on-chain games, metaverse
+- Other: anything that doesn't fit above
+
+Tweets:
+{numbered}
+
+Respond with ONLY a JSON object mapping tweet number to category name.
+Example: {{"1":"RWA","2":"DeFi","3":"Infrastructure"}}
+No explanation, no markdown, just the JSON."""
+
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": anthropic_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 800,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=30
+        )
+        if r.status_code == 200:
+            import json
+            raw = r.json()["content"][0]["text"].strip()
+            result = json.loads(raw)
+            return {int(k)-1: v for k,v in result.items()}
+    except:
+        pass
+    return {}
+
+def classify_tweets_narratives(tweets, anthropic_key):
+    """Classify all tweets, batch by 50, cache results on tweet objects"""
+    if not anthropic_key:
+        for t in tweets:
+            if "narrative" not in t:
+                t["narrative"] = detect_nar_keyword(t.get("text",""))
+        return tweets
+
+    # Only classify tweets that haven't been classified yet
+    unclassified = [t for t in tweets if "narrative" not in t]
+    if not unclassified:
+        return tweets
+
+    # Process in batches of 50
+    batch_size = 50
+    for i in range(0, len(unclassified), batch_size):
+        batch = unclassified[i:i+batch_size]
+        texts = tuple(t.get("text","") for t in batch)
+        results = classify_narratives_batch(texts, anthropic_key)
+        for j, t in enumerate(batch):
+            t["narrative"] = results.get(j, detect_nar_keyword(t.get("text","")))
+
+    return tweets
+
+def get_narrative(t):
+    """Get narrative for a tweet — single label"""
+    return t.get("narrative", detect_nar_keyword(t.get("text","")))
+
+def detect_nar(text):
+    """Legacy compatibility — returns list for render_post pills"""
+    result = detect_nar_keyword(text)
+    return [result]
 
 def iso_range(s, e):
     si = datetime.combine(s, datetime.min.time()).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -415,10 +502,8 @@ def render_gap_analysis(all_data):
                 insights.append((color, name, f"<b>{name}</b> có engagement rate cao hơn Mantle <b>{diff:.2f}%</b>. Nghiên cứu content format của {name} để tối ưu."))
 
         # narrative gap
-        m_nar = Counter()
-        for t in mantle.get("tweets", []): m_nar.update(detect_nar(t.get("text","")))
-        c_nar = Counter()
-        for t in d.get("tweets", []): c_nar.update(detect_nar(t.get("text","")))
+        m_nar = Counter(get_narrative(t) for t in mantle.get("tweets", []))
+        c_nar = Counter(get_narrative(t) for t in d.get("tweets", []))
         m_total = sum(m_nar.values()) or 1
         c_total = sum(c_nar.values()) or 1
         for nar in NARRATIVES:
@@ -547,6 +632,12 @@ def tab_mantle(token):
         tweets = get_tweets(uid, token, start_iso, end_iso) if uid else []
         prev_tw = get_tweets(uid, token, prev_s_iso, prev_e_iso) if uid else []
 
+    # Classify narratives with Claude
+    anthropic_key = get_anthropic_key()
+    if tweets:
+        with st.spinner("Classifying narratives with AI…"):
+            tweets = classify_tweets_narratives(tweets, anthropic_key)
+
     followers = user.get("public_metrics", {}).get("followers_count", 0) or 0
     total_eng = sum(eng(t.get("public_metrics",{})) for t in tweets)
     total_likes = sum(t.get("public_metrics",{}).get("like_count",0) or 0 for t in tweets)
@@ -594,9 +685,7 @@ def tab_mantle(token):
         st.plotly_chart(fig, use_container_width=True)
 
     # Narrative breakdown
-    all_nar = []
-    for t in tweets: all_nar.extend(detect_nar(t.get("text","")))
-    nar_counts = Counter(all_nar)
+    nar_counts = Counter(get_narrative(t) for t in tweets)
     if nar_counts:
         st.markdown('<div class="section-title">Narrative Breakdown</div>', unsafe_allow_html=True)
         nc1, nc2 = st.columns([1,2])
@@ -684,6 +773,12 @@ def tab_competitive(token):
             tw = get_tweets(uid, token, start_iso, end_iso) if uid else []
             ptw = get_tweets(uid, token, prev_s_iso, prev_e_iso) if uid else []
             all_data[name] = {"user":u, "tweets":tw, "prev":ptw, "color":color, "handle":handle}
+
+    # Classify narratives for all chains
+    with st.spinner("Classifying narratives with AI…"):
+        for name, d in all_data.items():
+            if d["tweets"]:
+                d["tweets"] = classify_tweets_narratives(d["tweets"], anthropic_key)
 
     # Alerts
     for name, d in all_data.items():
@@ -776,11 +871,9 @@ def tab_competitive(token):
     nar_cols = st.columns(len(CHAIN_COLORS))
     for col, (name, d) in zip(nar_cols, all_data.items()):
         color = d["color"]
-        all_n = []
-        for t in d["tweets"]: all_n.extend(detect_nar(t.get("text","")))
-        counts = Counter(all_n)
-        total = sum(counts.values()) or 1
+        counts = Counter(get_narrative(t) for t in d["tweets"])
         sorted_n = sorted(counts.items(), key=lambda x:-x[1])
+        total = sum(counts.values()) or 1
         with col:
             st.markdown(f'<div style="font-size:12px;font-weight:800;color:{color};margin-bottom:10px;text-transform:uppercase">{name}</div>', unsafe_allow_html=True)
             if sorted_n:
@@ -894,6 +987,13 @@ def tab_research(token):
             all_posts.extend(tw)
 
     filtered = [p for p in all_posts if any(k in p.get("text","").lower() for k in RESEARCH_KW)]
+
+    # Classify narratives
+    anthropic_key = get_anthropic_key()
+    if filtered:
+        with st.spinner("Classifying narratives with AI…"):
+            filtered = classify_tweets_narratives(filtered, anthropic_key)
+
     sorted_posts = sorted(filtered, key=get_imp, reverse=True)
 
     st.caption(f"Found {len(filtered)} research posts from {len(RESEARCH_ACCOUNTS)} accounts")
@@ -903,9 +1003,7 @@ def tab_research(token):
         return
 
     # Narrative distribution
-    all_nar = []
-    for p in filtered: all_nar.extend(detect_nar(p.get("text","")))
-    nar_counts = Counter(all_nar)
+    nar_counts = Counter(get_narrative(p) for p in filtered)
     nar_counts.pop("Other", None)
 
     if nar_counts:
