@@ -212,13 +212,17 @@ Be specific, data-driven, and actionable. Reference actual numbers. Respond with
             import json
             raw = r.json()["content"][0]["text"].strip()
             return json.loads(raw)
-    except:
-        pass
-    return None
+        else:
+            return {"_error": f"HTTP {r.status_code}: {r.text[:300]}"}
+    except Exception as e:
+        return {"_error": str(e)}
 
 def render_social_expert_analysis(analysis):
     if not analysis:
         st.info("AI analysis unavailable. Check Anthropic API key.")
+        return
+    if "_error" in analysis:
+        st.error(f"API Error: {analysis['_error']}")
         return
 
     score = analysis.get("overall_score", "—")
