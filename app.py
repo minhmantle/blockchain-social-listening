@@ -24,23 +24,39 @@ CHAIN_COLORS = {
     "Mantle":  MANTLE_GREEN,
     "Solana":  "#9945FF",
     "Base":    "#2563EB",
+    "Ondo":    "#FF6B35",
+}
+
+CHAIN_HANDLES = {
+    "Mantle": "Mantle_Official",
+    "Solana": "solana",
+    "Base":   "base",
+    "Ondo":   "OndoFinance",
 }
 
 NARRATIVES = {
-    "DeFi":          ["defi","dex","liquidity","yield","swap","lending","amm","tvl","staking"],
-    "RWA":           ["rwa","real world asset","tokenized","tokenization","treasury","bond","t-bill"],
-    "AI":            ["ai","artificial intelligence","machine learning","llm","agent","gpt"],
-    "Infrastructure":["infrastructure","layer2","l2","rollup","scalability","tps","validator","node"],
-    "NFT":           ["nft","collectible","mint","opensea","marketplace"],
-    "Gaming":        ["gaming","gamefi","game","play to earn","p2e","metaverse"],
+    "RWA":           ["rwa","real world asset","real-world asset","tokenized asset","tokenized bond",
+                      "tokenization","tokenise","tokenize","treasury","t-bill","t-bond","tbill",
+                      "ondo","usdy","ousg","blackrock buidl","security token","tokenized fund",
+                      "on-chain treasury","on-chain yield","institutional yield","real asset"],
+    "DeFi":          ["defi","dex","liquidity","yield","swap","lending","amm","tvl","staking",
+                      "vault","protocol","borrow","collateral","perpetual","perp","margin"],
+    "AI":            ["ai","artificial intelligence","machine learning","llm","agent","gpt",
+                      "ai agent","inference","model","neural","openai","claude","gemini"],
+    "Infrastructure":["infrastructure","layer2","l2","rollup","scalability","tps","validator",
+                      "node","zk","zkp","zkvm","op stack","sequencer","data availability","da",
+                      "modular","restaking","eigenlayer","avs","interop","bridge"],
     "Institutional": ["institution","institutional","blackrock","fidelity","bank","fund","etf",
-                      "investment","hedge fund","enterprise","corporate","adoption"],
+                      "investment","hedge fund","enterprise","corporate","adoption","tradfi",
+                      "regulated","compliance","custody","prime broker","asset manager"],
+    "NFT":           ["nft","collectible","mint","opensea","marketplace","pfp","digital art"],
+    "Gaming":        ["gaming","gamefi","game","play to earn","p2e","metaverse","onchain game"],
 }
 
 NARRATIVE_COLORS = {
-    "DeFi":"#3b82f6","RWA":"#f59e0b","AI":"#8b5cf6",
-    "Infrastructure":"#10b981","NFT":"#ec4899",
-    "Gaming":"#f97316","Institutional":"#06b6d4","Other":"#6b7280",
+    "RWA":"#f59e0b","DeFi":"#3b82f6","AI":"#8b5cf6",
+    "Infrastructure":"#10b981","Institutional":"#06b6d4",
+    "NFT":"#ec4899","Gaming":"#f97316","Other":"#6b7280",
 }
 
 AXIS = dict(gridcolor="#1A3320",showgrid=True,zeroline=False,color="#A0C8B0",tickfont=dict(color="#A0C8B0",size=11))
@@ -81,6 +97,57 @@ ALERT_THRESHOLDS = {
     "views_spike": 500_000,
     "eng_spike": 5_000,
 }
+
+def get_anthropic_key():
+    try: return st.secrets["ANTHROPIC_API_KEY"]
+    except: return None
+
+@st.cache_data(ttl=1800)
+def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
+    """Call Claude API to summarize content themes and narratives"""
+    if not anthropic_key or not tweets_text_list:
+        return None
+    sample = tweets_text_list[:30]
+    combined = "\n---\n".join(sample)
+    prompt = f"""Analyze these {len(sample)} tweets from {chain_name}'s official account.
+
+TWEETS:
+{combined}
+
+Provide a concise analysis in this exact JSON format:
+{{
+  "main_themes": ["theme1", "theme2", "theme3"],
+  "top_narrative": "name of dominant narrative",
+  "top_narrative_reason": "1-2 sentences explaining why this narrative dominates",
+  "content_summary": "2-3 sentences summarizing overall content strategy and topics",
+  "high_attention_topic": "the specific topic/announcement that got most engagement",
+  "high_attention_reason": "1-2 sentences explaining why it resonated"
+}}
+
+Respond with JSON only, no markdown, no extra text."""
+
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": anthropic_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 600,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=30
+        )
+        if r.status_code == 200:
+            import json
+            text = r.json()["content"][0]["text"]
+            return json.loads(text)
+    except:
+        pass
+    return None
 
 def get_token():
     try: return st.secrets["TWITTER_BEARER_TOKEN"]
@@ -280,54 +347,6 @@ def split_top_posts(tweets, n=5):
     remaining = [t for t in tweets if t.get("id") not in views_ids]
     top_eng = sorted(remaining, key=lambda t: eng(t.get("public_metrics",{})), reverse=True)[:n]
     return top_views, top_eng
-
-# ── FEATURE: TRENDING TOPICS ─────────────────────────────────────────────────
-def extract_trending_topics(tweets, top_n=20):
-    word_counts = Counter()
-    hashtag_counts = Counter()
-    for t in tweets:
-        text = t.get("text", "")
-        hashtags = re.findall(r'#(\w+)', text.lower())
-        hashtag_counts.update(hashtags)
-        words = re.findall(r'\b[a-z]{3,}\b', text.lower())
-        words = [w for w in words if w not in STOP_WORDS and not w.startswith('http')]
-        word_counts.update(words)
-    return word_counts.most_common(top_n), hashtag_counts.most_common(top_n)
-
-def render_trending_topics(tweets, color=MANTLE_GREEN):
-    words, hashtags = extract_trending_topics(tweets, top_n=15)
-    if not words and not hashtags:
-        return
-    st.markdown('<div class="section-title">Trending Topics & Hashtags</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f'<div style="font-size:11px;font-weight:700;color:{color};margin-bottom:10px">📝 Top Keywords</div>', unsafe_allow_html=True)
-        if words:
-            max_count = words[0][1] or 1
-            for word, count in words[:10]:
-                pct = count / max_count * 100
-                st.markdown(f"""
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                  <div style="font-size:12px;color:{MANTLE_TEXT};font-weight:500;min-width:90px">{word}</div>
-                  <div style="flex:1;background:{MANTLE_BORDER};border-radius:4px;height:6px">
-                    <div style="width:{pct}%;background:{color};border-radius:4px;height:6px"></div>
-                  </div>
-                  <div style="font-size:11px;color:{MANTLE_MUTED};min-width:24px">{count}</div>
-                </div>""", unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div style="font-size:11px;font-weight:700;color:{color};margin-bottom:10px"># Top Hashtags</div>', unsafe_allow_html=True)
-        if hashtags:
-            max_count = hashtags[0][1] or 1
-            for tag, count in hashtags[:10]:
-                pct = count / max_count * 100
-                st.markdown(f"""
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                  <div style="font-size:12px;color:{color};font-weight:600;min-width:90px">#{tag}</div>
-                  <div style="flex:1;background:{MANTLE_BORDER};border-radius:4px;height:6px">
-                    <div style="width:{pct}%;background:{color};border-radius:4px;height:6px"></div>
-                  </div>
-                  <div style="font-size:11px;color:{MANTLE_MUTED};min-width:24px">{count}</div>
-                </div>""", unsafe_allow_html=True)
 
 # ── FEATURE: ALERTS ───────────────────────────────────────────────────────────
 def check_alerts(tweets, chain_name="Mantle"):
@@ -607,9 +626,6 @@ def tab_mantle(token):
                   </div>
                 </div>""", unsafe_allow_html=True)
 
-    # Trending topics
-    render_trending_topics(tweets, color=MANTLE_GREEN)
-
     # Top posts split
     top_views, top_eng_list = split_top_posts(tweets, n=5)
     st.markdown('<div class="section-title">Top Posts</div>', unsafe_allow_html=True)
@@ -647,9 +663,9 @@ def tab_mantle(token):
 # ── TAB 2 ────────────────────────────────────────────────────────────────────
 def tab_competitive(token):
     tab_description(
-        "Competitive Analysis — Mantle vs Solana vs Base",
-        "Compares official post performance across 3 chains side by side. Includes gap analysis, views, engagement trends, narrative distribution, and top KOL mentions.",
-        ["Mantle_Official","solana","base"],
+        "Competitive Analysis — Mantle vs Solana vs Base vs Ondo",
+        "Compares official post performance across 4 chains side by side. Includes AI content summary, gap analysis, narrative breakdown per chain, and top KOL mentions.",
+        ["Mantle_Official","solana","base","OndoFinance"],
         "Official posts: custom date range · KOL mentions: last 7 days"
     )
     start, end, period = date_controls("t2")
@@ -657,18 +673,19 @@ def tab_competitive(token):
     days = (end - start).days + 1
     prev_s_iso, prev_e_iso = iso_range(start - timedelta(days=days), start - timedelta(days=1))
     si7, ei7 = search_iso()
+    anthropic_key = get_anthropic_key()
 
     all_data = {}
     with st.spinner("Fetching all chains…"):
         for name, color in CHAIN_COLORS.items():
-            handle = {"Mantle":"Mantle_Official","Solana":"solana","Base":"base"}[name]
+            handle = CHAIN_HANDLES[name]
             u = get_user(handle, token)
             uid = u.get("id", "")
             tw = get_tweets(uid, token, start_iso, end_iso) if uid else []
             ptw = get_tweets(uid, token, prev_s_iso, prev_e_iso) if uid else []
             all_data[name] = {"user":u, "tweets":tw, "prev":ptw, "color":color, "handle":handle}
 
-    # Alerts for all chains
+    # Alerts
     for name, d in all_data.items():
         alerts = check_alerts(d["tweets"], name)
         if alerts:
@@ -698,6 +715,45 @@ def tab_competitive(token):
 
     st.markdown("<div style='margin-top:16px'></div>", unsafe_allow_html=True)
 
+    # ── AI Content Summary ────────────────────────────────────────────────────
+    st.markdown('<div class="section-title">🤖 AI Content Analysis</div>', unsafe_allow_html=True)
+    if not anthropic_key:
+        st.warning("Add ANTHROPIC_API_KEY to Streamlit Secrets to enable AI analysis.")
+    else:
+        ai_cols = st.columns(len(CHAIN_COLORS))
+        for col, (name, d) in zip(ai_cols, all_data.items()):
+            color = d["color"]
+            with col:
+                st.markdown(f'<div style="font-size:12px;font-weight:800;color:{color};margin-bottom:8px;text-transform:uppercase">{name}</div>', unsafe_allow_html=True)
+                if not d["tweets"]:
+                    st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>', unsafe_allow_html=True)
+                    continue
+                with st.spinner(f"Analyzing {name}…"):
+                    texts = [t.get("text","") for t in d["tweets"] if t.get("text","")]
+                    summary = ai_content_summary(name, texts, anthropic_key)
+                if summary:
+                    top_nar = summary.get("top_narrative","—")
+                    nar_color = NARRATIVE_COLORS.get(top_nar, color)
+                    st.markdown(f"""
+                    <div style="background:{MANTLE_SURFACE};border:1px solid {color}33;border-left:3px solid {color};border-radius:8px;padding:12px;margin-bottom:8px">
+                      <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:4px">CONTENT OVERVIEW</div>
+                      <div style="font-size:12px;color:{MANTLE_TEXT};line-height:1.6;margin-bottom:10px">{summary.get("content_summary","—")}</div>
+                      <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:4px">TOP NARRATIVE</div>
+                      <div style="margin-bottom:6px">
+                        <span style="background:{nar_color}22;color:{nar_color};border:1px solid {nar_color}44;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700">{top_nar}</span>
+                      </div>
+                      <div style="font-size:12px;color:{MANTLE_TEXT};line-height:1.6;margin-bottom:10px">{summary.get("top_narrative_reason","—")}</div>
+                      <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:4px">HIGH-ATTENTION TOPIC</div>
+                      <div style="font-size:12px;color:#f59e0b;font-weight:600;margin-bottom:4px">{summary.get("high_attention_topic","—")}</div>
+                      <div style="font-size:12px;color:{MANTLE_TEXT};line-height:1.6">{summary.get("high_attention_reason","—")}</div>
+                    </div>""", unsafe_allow_html=True)
+                    themes = summary.get("main_themes", [])
+                    if themes:
+                        pills = " ".join([f'<span style="background:{color}22;color:{color};border:1px solid {color}33;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600">{th}</span>' for th in themes])
+                        st.markdown(f'<div style="margin-top:4px">{pills}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">Analysis unavailable</div>', unsafe_allow_html=True)
+
     # Gap analysis
     render_gap_analysis(all_data)
 
@@ -714,6 +770,40 @@ def tab_competitive(token):
                       title=dict(text=f"Views by {period} — all chains",
                                  font=dict(size=13, color="#E0F5EC"), x=0))
     st.plotly_chart(fig, use_container_width=True)
+
+    # ── Per-chain narrative breakdown ─────────────────────────────────────────
+    st.markdown('<div class="section-title">Narrative Breakdown by Chain</div>', unsafe_allow_html=True)
+    nar_cols = st.columns(len(CHAIN_COLORS))
+    for col, (name, d) in zip(nar_cols, all_data.items()):
+        color = d["color"]
+        all_n = []
+        for t in d["tweets"]: all_n.extend(detect_nar(t.get("text","")))
+        counts = Counter(all_n)
+        total = sum(counts.values()) or 1
+        sorted_n = sorted(counts.items(), key=lambda x:-x[1])
+        with col:
+            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{color};margin-bottom:10px;text-transform:uppercase">{name}</div>', unsafe_allow_html=True)
+            if sorted_n:
+                labels = [n for n,_ in sorted_n]
+                values = [c for _,c in sorted_n]
+                colors = [NARRATIVE_COLORS.get(n,"#666") for n in labels]
+                fp = go.Figure(go.Pie(
+                    labels=labels, values=values,
+                    marker=dict(colors=colors, line=dict(color=MANTLE_DARK, width=2)),
+                    textfont_size=10, hole=0.5,
+                    hovertemplate="%{label}: %{value} posts (%{percent})<extra></extra>"))
+                pl = {k:v for k,v in BASE_LAYOUT.items() if k != "margin"}
+                fp.update_layout(**pl, height=220, showlegend=True,
+                                 margin=dict(l=0,r=0,t=10,b=0),
+                                 legend=dict(font=dict(size=10,color="#E0F5EC"),
+                                             bgcolor="rgba(0,0,0,0)"))
+                st.plotly_chart(fp, use_container_width=True)
+                # top narrative label
+                top = sorted_n[0]
+                tc = NARRATIVE_COLORS.get(top[0],"#666")
+                st.markdown(f'<div style="text-align:center;font-size:11px;color:{tc};font-weight:700">#{1} {top[0]} · {top[1]/total*100:.0f}%</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>', unsafe_allow_html=True)
 
     # Top posts per chain
     st.markdown('<div class="section-title">Top Official Posts by Chain</div>', unsafe_allow_html=True)
@@ -743,6 +833,8 @@ def tab_competitive(token):
             q = '"Base chain" OR "Base blockchain" OR "build on Base" (crypto OR blockchain OR web3) -from:base -is:retweet lang:en min_faves:50'
         elif name == "Solana":
             q = '(#Solana OR "Solana network" OR "SOL blockchain") (crypto OR blockchain OR defi OR web3) -from:solana -is:retweet lang:en min_faves:50'
+        elif name == "Ondo":
+            q = '(#Ondo OR "Ondo Finance" OR USDY OR OUSG) (crypto OR blockchain OR rwa OR defi) -from:OndoFinance -is:retweet lang:en min_faves:20'
         else:
             q = '(#Mantle OR "Mantle network" OR "Mantle blockchain" OR mETH) (crypto OR blockchain OR defi OR web3) -from:Mantle_Official -is:retweet lang:en min_faves:20'
         with st.spinner(f"Fetching {name} mentions…"):
@@ -755,25 +847,6 @@ def tab_competitive(token):
                 for i, t in enumerate(sm[:3], 1): render_post(t, i, d["color"], chain_name=name, is_user=True)
             else:
                 st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No mentions found</div>', unsafe_allow_html=True)
-
-    # Narrative comparison
-    st.markdown('<div class="section-title">Narrative Distribution by Chain</div>', unsafe_allow_html=True)
-    nfig = go.Figure()
-    for name, d in all_data.items():
-        all_n = []
-        for t in d["tweets"]: all_n.extend(detect_nar(t.get("text","")))
-        counts = Counter(all_n)
-        total = sum(counts.values()) or 1
-        nfig.add_trace(go.Bar(name=name,
-            x=list(NARRATIVES.keys()) + ["Other"],
-            y=[counts.get(k,0)/total*100 for k in list(NARRATIVES.keys()) + ["Other"]],
-            marker_color=d["color"],
-            hovertemplate="%{x}: %{y:.1f}%<extra>" + name + "</extra>"))
-    nfig.update_layout(**BASE_LAYOUT, barmode="group", height=260,
-                       xaxis=AXIS, yaxis=dict(**AXIS, ticksuffix="%"),
-                       title=dict(text="Narrative distribution % by chain",
-                                  font=dict(size=13, color="#E0F5EC"), x=0))
-    st.plotly_chart(nfig, use_container_width=True)
 
     # Export
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
@@ -828,9 +901,6 @@ def tab_research(token):
     if not filtered:
         st.warning("No research posts found. Try adjusting the date range.")
         return
-
-    # Trending topics across all research posts
-    render_trending_topics(filtered, color="#A0C8B0")
 
     # Narrative distribution
     all_nar = []
