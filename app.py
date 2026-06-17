@@ -563,61 +563,24 @@ def render_alerts(alerts, chain_name, color):
     if not alerts: return
     items = []
     for alert_type, t, val in alerts[:5]:
-        text = t.get("text","")[:80] + "…"
+        text = t.get("text","")[:60] + "…"
         metric = f"{fmt(val)} views" if alert_type == "views" else f"{fmt(val)} eng"
         icon = "👁" if alert_type == "views" else "⚡"
-        tid = t.get("id","")
-        handle = {"Mantle":"Mantle_Official","Solana":"solana","Base":"base","Ondo":"OndoFinance"}.get(chain_name, chain_name)
-        link = f"https://x.com/{handle}/status/{tid}"
-        items.append(f'{icon} <b style="color:#f59e0b">{metric}</b> &nbsp;·&nbsp; {text} &nbsp;<a href="{link}" target="_blank" style="color:{color};font-weight:600;font-size:11px">↗</a>')
+        items.append(f'{icon} {metric} · {text}')
 
-    # Build CSS keyframe animation cycling through all items
-    n = len(items)
-    duration = n * 4  # 4s per item
-    pct_per = 100 / n
-    
-    keyframes = ""
-    for i, item in enumerate(items):
-        start = i * pct_per
-        end = (i + 1) * pct_per
-        fade_in = start + 0.5
-        fade_out = end - 0.5
-        keyframes += f"""
-        {start:.1f}% {{ opacity:0; }}
-        {fade_in:.1f}% {{ opacity:1; }}
-        {fade_out:.1f}% {{ opacity:1; }}
-        {end:.1f}% {{ opacity:0; }}"""
+    ticker_text = "  &nbsp;&nbsp;|&nbsp;&nbsp;  ".join(items)
+    uid = abs(hash(chain_name)) % 99999
 
-    uid = abs(hash(chain_name + str(len(alerts)))) % 99999
-    items_html = "".join([
-        f'<span class="alert-item-{uid}" style="display:none;animation:alertfade{uid} {duration}s ease infinite;animation-delay:{i*4}s">{item}</span>'
-        for i, item in enumerate(items)
-    ])
-
-    st.markdown(f"""
-    <style>
-    @keyframes alertfade{uid} {{
-      0%,100% {{ opacity:0; }}
-      10% {{ opacity:1; }}
-      80% {{ opacity:1; }}
-      90% {{ opacity:0; }}
-    }}
-    .alert-item-{uid} {{
-        display:inline !important;
-        opacity:0;
-        animation: alertfade{uid} {duration}s ease infinite;
-    }}
-    {" ".join([f".alert-item-{uid}:nth-child({i+1}) {{ animation-delay:{i*4}s; }}" for i in range(n)])}
-    </style>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;min-height:24px">
-      <span style="background:{color}22;color:{color};border:1px solid {color}44;
-            padding:2px 10px;border-radius:99px;font-size:10px;font-weight:700;
-            white-space:nowrap;flex-shrink:0">🔔 {chain_name.upper()}</span>
-      <div style="font-size:12px;color:{MANTLE_TEXT};flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
-        {items_html}
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<style>
+@keyframes ticker{uid}{{0%{{transform:translateX(100%)}}100%{{transform:translateX(-100%)}}}}
+.ticker{uid}{{display:inline-block;animation:ticker{uid} {max(12, len(items)*6)}s linear infinite;white-space:nowrap;}}
+</style>
+<div style="display:flex;align-items:center;gap:8px;overflow:hidden;margin-bottom:6px;background:{color}11;border:1px solid {color}33;border-radius:8px;padding:5px 10px">
+  <span style="color:{color};font-size:10px;font-weight:800;white-space:nowrap;flex-shrink:0">🔔 {chain_name.upper()}</span>
+  <div style="overflow:hidden;flex:1">
+    <span class="ticker{uid}" style="font-size:12px;color:{MANTLE_TEXT}">{ticker_text}</span>
+  </div>
+</div>""", unsafe_allow_html=True)
 
 # ── FEATURE: COMPETITOR GAP ANALYSIS ─────────────────────────────────────────
 def render_gap_analysis(all_data):
