@@ -103,6 +103,42 @@ def get_anthropic_key():
     except: return None
 
 @st.cache_data(ttl=1800)
+def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
+    """Call Claude API to summarize content themes and narratives"""
+    if not anthropic_key or not tweets_text_list:
+        return None
+    sample = tweets_text_list[:30]
+    combined = "\n---\n".join(sample)
+    prompt = f"""Analyze these {len(sample)} tweets from {chain_name}'s official account.
+
+TWEETS:
+{combined}
+
+Provide a concise analysis in this exact JSON format:
+{{"main_themes": ["theme1", "theme2", "theme3"],
+  "top_narrative": "name of dominant narrative",
+  "top_narrative_reason": "1-2 sentences explaining why this narrative dominates",
+  "content_summary": "2-3 sentences summarizing overall content strategy and topics",
+  "high_attention_topic": "the specific topic/announcement that got most engagement",
+  "high_attention_reason": "1-2 sentences explaining why it resonated"
+}}
+
+Respond with JSON only, no markdown, no extra text."""
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600,
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=30
+        )
+        if r.status_code == 200:
+            import json
+            return json.loads(r.json()["content"][0]["text"])
+    except: pass
+    return None
+
+@st.cache_data(ttl=1800)
 def ai_social_expert_analysis(tweets_data, metrics_data, anthropic_key):
     """Claude as social media expert analyzing Mantle's content performance"""
     if not anthropic_key or not tweets_data:
