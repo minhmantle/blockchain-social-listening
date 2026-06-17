@@ -209,8 +209,12 @@ Be specific, data-driven, and actionable. Reference actual numbers. Respond with
             timeout=30
         )
         if r.status_code == 200:
-            import json
+            import json, re
             raw = r.json()["content"][0]["text"].strip()
+            # strip markdown code fences if present
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+            raw = raw.strip()
             return json.loads(raw)
         else:
             return {"_error": f"HTTP {r.status_code}: {r.text[:300]}"}
@@ -299,12 +303,13 @@ Respond with JSON only, no markdown, no extra text."""
             timeout=30
         )
         if r.status_code == 200:
-            import json
-            text = r.json()["content"][0]["text"]
-            return json.loads(text)
-    except:
-        pass
-    return None
+            import json, re as re2
+            raw = r.json()["content"][0]["text"].strip()
+            raw = re2.sub(r'^[^{[]*', "", raw)
+            raw = re2.sub(r'[^}\]]*$', "", raw)
+            return json.loads(raw)
+    except Exception as e:
+        return None
 
 def get_token():
     try: return st.secrets["TWITTER_BEARER_TOKEN"]
