@@ -792,7 +792,7 @@ def tab_competitive(token):
                     marker=dict(colors=colors, line=dict(color=MANTLE_DARK, width=2)),
                     textfont_size=10, hole=0.5,
                     hovertemplate="%{label}: %{value} posts (%{percent})<extra></extra>"))
-                pl = {k:v for k,v in BASE_LAYOUT.items() if k != "margin"}
+                pl = {k:v for k,v in BASE_LAYOUT.items() if k not in ("margin","legend")}
                 fp.update_layout(**pl, height=220, showlegend=True,
                                  margin=dict(l=0,r=0,t=10,b=0),
                                  legend=dict(font=dict(size=10,color="#E0F5EC"),
