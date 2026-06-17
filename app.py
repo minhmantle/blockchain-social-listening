@@ -897,11 +897,17 @@ def tab_mantle(token):
             "narratives": nar_summary,
         }
         with st.spinner("Running AI social analysis…"):
-            analysis = ai_social_expert_analysis(
-                tuple(tweets),
-                tuple(sorted(metrics_data.items())),
-                anthropic_key
-            )
+            try:
+                analysis = ai_social_expert_analysis(
+                    tuple(tweets),
+                    tuple(sorted(metrics_data.items())),
+                    anthropic_key
+                )
+                if not analysis:
+                    st.error(f"API returned None. Key starts with: {anthropic_key[:10] if anthropic_key else 'MISSING'}")
+            except Exception as ex:
+                st.error(f"Error: {ex}")
+                analysis = None
         render_social_expert_analysis(analysis)
 
     # Export report
