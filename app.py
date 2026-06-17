@@ -226,32 +226,26 @@ def detect_nar_keyword(text):
 
 @st.cache_data(ttl=1800)
 def classify_narratives_batch(texts_tuple, anthropic_key):
-    """Use Claude to classify a batch of tweets into single narratives"""
+    """Use Claude to classify tweets into narratives — free-form labels"""
     if not anthropic_key:
         return {}
     texts = list(texts_tuple)
-    narrative_list = ", ".join(list(NARRATIVES.keys()) + ["Other"])
     numbered = "\n".join([f"{i+1}. {t[:200]}" for i,t in enumerate(texts)])
-    prompt = f"""Classify each tweet into exactly ONE narrative category.
+    prompt = f"""You are a crypto analyst. Classify each tweet into a single narrative label.
 
-Categories: {narrative_list}
-
-Definitions:
-- RWA: real world assets, tokenized bonds/treasuries, institutional yield, Ondo, USDY, OUSG, t-bills on-chain
-- DeFi: decentralized finance, DEX, lending, yield farming, liquidity, TVL, AMM
-- AI: artificial intelligence, LLM, AI agents, machine learning in crypto
-- Infrastructure: L2, rollups, ZK, scalability, bridges, validators, data availability, restaking
-- Institutional: banks, ETF, asset managers, BlackRock, TradFi adoption, regulated products
-- NFT: NFTs, digital collectibles, minting, marketplaces
-- Gaming: GameFi, play-to-earn, on-chain games, metaverse
-- Other: anything that doesn't fit above
+Rules:
+- Use existing crypto narratives when clearly applicable: RWA, DeFi, AI, Infrastructure, Institutional, NFT, Gaming
+- If the tweet doesn't fit those, create a short descriptive label (1-3 words max): e.g. "Community", "Partnership", "Market Update", "Meme", "Product Launch", "Ecosystem", "Stablecoin", "Restaking", "Tokenomics", "Regulatory"
+- Each tweet gets exactly ONE label
+- Be specific — don't default to "Other" unless truly uncategorizable
+- Context matters: a tweet about SpaceX token = "Meme", not "DeFi"
 
 Tweets:
 {numbered}
 
-Respond with ONLY a JSON object mapping tweet number to category name.
-Example: {{"1":"RWA","2":"DeFi","3":"Infrastructure"}}
-No explanation, no markdown, just the JSON."""
+Respond with ONLY a JSON object. Example:
+{{"1":"RWA","2":"DeFi","3":"Meme","4":"Community","5":"Infrastructure"}}
+No explanation, no markdown, just JSON."""
 
     try:
         r = requests.post(
@@ -300,6 +294,23 @@ def classify_tweets_narratives(tweets, anthropic_key):
             t["narrative"] = results.get(j, detect_nar_keyword(t.get("text","")))
 
     return tweets
+
+def get_nar_color(label):
+    """Get color for a narrative label — fixed for known ones, generated for dynamic ones"""
+    fixed = {
+        "RWA":"#f59e0b","DeFi":"#3b82f6","AI":"#8b5cf6",
+        "Infrastructure":"#10b981","Institutional":"#06b6d4",
+        "NFT":"#ec4899","Gaming":"#f97316","Other":"#6b7280",
+        "Community":"#84cc16","Partnership":"#22d3ee","Market Update":"#fb923c",
+        "Meme":"#f43f5e","Product Launch":"#a78bfa","Ecosystem":"#34d399",
+        "Stablecoin":"#fbbf24","Restaking":"#60a5fa","Tokenomics":"#c084fc",
+        "Regulatory":"#94a3b8",
+    }
+    if label in fixed:
+        return fixed[label]
+    # generate consistent color from label hash
+    h = abs(hash(label)) % 360
+    return f"hsl({h},65%,55%)"
 
 def get_narrative(t):
     """Get narrative for a tweet — single label"""
@@ -384,7 +395,7 @@ def render_post(t, rank, color, chain_name=None, is_user=False):
     ago = time_ago(t.get("created_at", ""))
     narrs = detect_nar(text)
     badge = f'<span class="narrative-pill" style="background:{color}22;color:{color};border:1px solid {color}44;font-size:10px;padding:2px 8px;border-radius:99px">{chain_name}</span>' if chain_name else ""
-    pills = " ".join([f'<span class="narrative-pill" style="background:{NARRATIVE_COLORS.get(n,"#333")}22;color:{NARRATIVE_COLORS.get(n,"#888")};border:1px solid {NARRATIVE_COLORS.get(n,"#333")}33">{n}</span>' for n in narrs])
+    pills = " ".join([f'<span class="narrative-pill" style="background:{get_nar_color(n)}22;color:{get_nar_color(n)};border:1px solid {get_nar_color(n)}33">{n}</span>' for n in narrs])
     fstr = f" · {fmt(followers)} followers" if followers else ""
     st.markdown(f"""
     <div class="post-card">
@@ -548,7 +559,7 @@ def generate_report(tab_name, date_range, kpis, top_posts, narratives):
 
     kpi_html = "".join([f'<div style="display:inline-block;background:#f8f9fa;border-radius:8px;padding:12px 20px;margin:6px;text-align:center"><div style="font-size:11px;color:#999;text-transform:uppercase">{k}</div><div style="font-size:22px;font-weight:800;color:#00D395">{v}</div></div>' for k, v in kpis.items()])
 
-    nar_html = "".join([f'<span style="display:inline-block;background:{NARRATIVE_COLORS.get(n,"#666")}22;color:{NARRATIVE_COLORS.get(n,"#666")};border:1px solid {NARRATIVE_COLORS.get(n,"#666")}44;padding:4px 12px;border-radius:99px;margin:3px;font-size:12px;font-weight:600">{n}: {c}</span>' for n, c in sorted(narratives.items(), key=lambda x:-x[1])[:8]])
+    nar_html = "".join([f'<span style="display:inline-block;background:{get_nar_color(n)}22;color:{get_nar_color(n)};border:1px solid {get_nar_color(n)}44;padding:4px 12px;border-radius:99px;margin:3px;font-size:12px;font-weight:600">{n}: {c}</span>' for n, c in sorted(narratives.items(), key=lambda x:-x[1])[:8]])
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -692,7 +703,7 @@ def tab_mantle(token):
         with nc1:
             labels = list(nar_counts.keys())
             values = list(nar_counts.values())
-            colors = [NARRATIVE_COLORS.get(l,"#666") for l in labels]
+            colors = [get_nar_color(l) for l in labels]
             fp = go.Figure(go.Pie(labels=labels, values=values,
                                   marker=dict(colors=colors, line=dict(color=MANTLE_DARK, width=2)),
                                   textfont_size=11, hole=0.55,
@@ -703,7 +714,7 @@ def tab_mantle(token):
         with nc2:
             total_n = sum(nar_counts.values()) or 1
             for nm, cnt in sorted(nar_counts.items(), key=lambda x:-x[1]):
-                c = NARRATIVE_COLORS.get(nm, "#666")
+                c = get_nar_color(nm)
                 pct = cnt / total_n * 100
                 st.markdown(f"""
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -879,7 +890,7 @@ def tab_competitive(token):
             if sorted_n:
                 labels = [n for n,_ in sorted_n]
                 values = [c for _,c in sorted_n]
-                colors = [NARRATIVE_COLORS.get(n,"#666") for n in labels]
+                colors = [get_nar_color(n) for n in labels]
                 fp = go.Figure(go.Pie(
                     labels=labels, values=values,
                     marker=dict(colors=colors, line=dict(color=MANTLE_DARK, width=2)),
@@ -893,7 +904,7 @@ def tab_competitive(token):
                 st.plotly_chart(fp, use_container_width=True)
                 # top narrative label
                 top = sorted_n[0]
-                tc = NARRATIVE_COLORS.get(top[0],"#666")
+                tc = get_nar_color(top[0])
                 st.markdown(f'<div style="text-align:center;font-size:11px;color:{tc};font-weight:700">#{1} {top[0]} · {top[1]/total*100:.0f}%</div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>', unsafe_allow_html=True)
@@ -1013,7 +1024,7 @@ def tab_research(token):
         fb = go.Figure(go.Bar(
             x=[n for n,_ in sn],
             y=[c/total_n*100 for _,c in sn],
-            marker_color=[NARRATIVE_COLORS.get(n,"#666") for n,_ in sn],
+            marker_color=[get_nar_color(n) for n,_ in sn],
             text=[f"{c/total_n*100:.0f}%" for _,c in sn],
             textposition="outside",
             hovertemplate="%{x}: %{y:.1f}% (%{customdata} posts)<extra></extra>",
