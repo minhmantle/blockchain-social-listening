@@ -561,26 +561,26 @@ def check_alerts(tweets, chain_name="Mantle"):
 
 def render_alerts(alerts, chain_name, color):
     if not alerts: return
-    items = []
+    rows = []
     for alert_type, t, val in alerts[:5]:
-        text = t.get("text","")[:60] + "…"
+        text = t.get("text","")[:70] + "…"
         metric = f"{fmt(val)} views" if alert_type == "views" else f"{fmt(val)} eng"
         icon = "👁" if alert_type == "views" else "⚡"
-        items.append(f'{icon} {metric} · {text}')
+        tid = t.get("id","")
+        handle = {"Mantle":"Mantle_Official","Solana":"solana","Base":"base","Ondo":"OndoFinance"}.get(chain_name, chain_name)
+        link = f"https://x.com/{handle}/status/{tid}"
+        rows.append(f"""<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid {color}22;overflow:hidden">
+          <span style="font-size:10px;font-weight:700;color:#f59e0b;white-space:nowrap">{icon} {metric}</span>
+          <span style="font-size:11px;color:{MANTLE_MUTED};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{text}</span>
+          <a href="{link}" target="_blank" style="color:{color};font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;text-decoration:none">↗ X</a>
+        </div>""")
 
-    ticker_text = "  &nbsp;&nbsp;|&nbsp;&nbsp;  ".join(items)
-    uid = abs(hash(chain_name)) % 99999
-
-    st.markdown(f"""<style>
-@keyframes ticker{uid}{{0%{{transform:translateX(100%)}}100%{{transform:translateX(-100%)}}}}
-.ticker{uid}{{display:inline-block;animation:ticker{uid} {max(12, len(items)*6)}s linear infinite;white-space:nowrap;}}
-</style>
-<div style="display:flex;align-items:center;gap:8px;overflow:hidden;margin-bottom:6px;background:{color}11;border:1px solid {color}33;border-radius:8px;padding:5px 10px">
-  <span style="color:{color};font-size:10px;font-weight:800;white-space:nowrap;flex-shrink:0">🔔 {chain_name.upper()}</span>
-  <div style="overflow:hidden;flex:1">
-    <span class="ticker{uid}" style="font-size:12px;color:{MANTLE_TEXT}">{ticker_text}</span>
-  </div>
-</div>""", unsafe_allow_html=True)
+    rows_html = "".join(rows)
+    st.markdown(f"""
+    <div style="background:{color}08;border:1px solid {color}33;border-radius:8px;padding:6px 10px;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:800;color:{color};margin-bottom:4px;letter-spacing:.08em">🔔 {chain_name.upper()} — HIGH PERFORMANCE</div>
+      {rows_html}
+    </div>""", unsafe_allow_html=True)
 
 # ── FEATURE: COMPETITOR GAP ANALYSIS ─────────────────────────────────────────
 def render_gap_analysis(all_data):
