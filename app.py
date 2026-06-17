@@ -139,18 +139,23 @@ Respond with JSON only, no markdown, no extra text."""
     return None
 
 @st.cache_data(ttl=1800)
-def ai_social_expert_analysis(tweets_data, metrics_data, anthropic_key):
+def ai_social_expert_analysis(tweets_tuple, metrics_data, anthropic_key):
     """Claude as social media expert analyzing Mantle's content performance"""
-    if not anthropic_key or not tweets_data:
+    if not anthropic_key or not tweets_tuple:
         return None
-
+    tweets_data = list(tweets_tuple)
+    metrics_data = dict(metrics_data)  # convert back from tuple of items
     # Prepare tweet samples with metrics
     samples = []
     for t in tweets_data[:30]:
         m = t.get("public_metrics", {})
+        imp = m.get("impression_count") or 0
+        if not imp:
+            e_val = (m.get("like_count",0) or 0) + (m.get("retweet_count",0) or 0)*3 + (m.get("reply_count",0) or 0)*2
+            imp = e_val * 100
         samples.append({
             "text": t.get("text","")[:200],
-            "views": get_imp(t),
+            "views": imp,
             "likes": m.get("like_count",0),
             "retweets": m.get("retweet_count",0),
             "narrative": t.get("narrative","Other")
@@ -894,7 +899,7 @@ def tab_mantle(token):
         with st.spinner("Running AI social analysis…"):
             analysis = ai_social_expert_analysis(
                 tuple(tweets),
-                metrics_data,
+                tuple(sorted(metrics_data.items())),
                 anthropic_key
             )
         render_social_expert_analysis(analysis)
