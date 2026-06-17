@@ -103,7 +103,119 @@ def get_anthropic_key():
     except: return None
 
 @st.cache_data(ttl=1800)
-def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
+def ai_social_expert_analysis(tweets_data, metrics_data, anthropic_key):
+    """Claude as social media expert analyzing Mantle's content performance"""
+    if not anthropic_key or not tweets_data:
+        return None
+
+    # Prepare tweet samples with metrics
+    samples = []
+    for t in tweets_data[:30]:
+        m = t.get("public_metrics", {})
+        samples.append({
+            "text": t.get("text","")[:200],
+            "views": get_imp(t),
+            "likes": m.get("like_count",0),
+            "retweets": m.get("retweet_count",0),
+            "narrative": t.get("narrative","Other")
+        })
+
+    prompt = f"""You are a senior crypto social media strategist with 10+ years experience.
+Analyze @Mantle_Official's Twitter/X performance for the given period.
+
+PERFORMANCE METRICS:
+- Total posts: {metrics_data['post_count']}
+- Total views: {metrics_data['total_views']:,}
+- Total likes: {metrics_data['total_likes']:,}
+- Total retweets: {metrics_data['total_rts']:,}
+- Engagement rate: {metrics_data['eng_rate']:.2f}%
+- Followers: {metrics_data['followers']:,}
+- vs previous period: views {metrics_data['view_delta']:+.1f}%, posts {metrics_data['post_delta']:+.1f}%
+
+NARRATIVE DISTRIBUTION:
+{metrics_data['narratives']}
+
+SAMPLE POSTS (with performance):
+{str(samples[:15])}
+
+Provide a professional analysis in this exact JSON format:
+{{
+  "overall_score": "Good/Average/Needs Improvement",
+  "overall_assessment": "2-3 sentences overall assessment of content performance",
+  "engagement_analysis": "2-3 sentences on whether engagement rate is healthy for this follower count and how it compares to crypto industry benchmarks",
+  "content_quality": "2-3 sentences on content quality, depth, and relevance to market trends",
+  "narrative_fit": "2-3 sentences on whether their narrative focus aligns with current market interest",
+  "strengths": ["strength 1", "strength 2", "strength 3"],
+  "weaknesses": ["weakness 1", "weakness 2", "weakness 3"],
+  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"]
+}}
+
+Be specific, data-driven, and actionable. Reference actual numbers. Respond with JSON only."""
+
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": anthropic_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1000,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=30
+        )
+        if r.status_code == 200:
+            import json
+            raw = r.json()["content"][0]["text"].strip()
+            return json.loads(raw)
+    except:
+        pass
+    return None
+
+def render_social_expert_analysis(analysis):
+    if not analysis:
+        st.info("AI analysis unavailable. Check Anthropic API key.")
+        return
+
+    score = analysis.get("overall_score", "—")
+    score_color = {"Good": MANTLE_GREEN, "Average": "#f59e0b", "Needs Improvement": "#f87171"}.get(score, MANTLE_MUTED)
+
+    st.markdown(f"""
+    <div style="background:{MANTLE_SURFACE};border:1px solid {score_color}44;border-radius:12px;padding:20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:800;color:{MANTLE_TEXT}">🧠 AI Social Expert Analysis</div>
+        <span style="background:{score_color}22;color:{score_color};border:1px solid {score_color}44;padding:3px 12px;border-radius:99px;font-size:11px;font-weight:700">{score}</span>
+      </div>
+      <div style="font-size:13px;color:{MANTLE_TEXT};line-height:1.7;margin-bottom:14px">{analysis.get("overall_assessment","")}</div>
+    </div>""", unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f'<div style="font-size:12px;font-weight:700;color:{MANTLE_MUTED};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">📊 Engagement Analysis</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:13px;color:{MANTLE_TEXT};line-height:1.7;margin-bottom:14px">{analysis.get("engagement_analysis","")}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:12px;font-weight:700;color:{MANTLE_MUTED};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">🎯 Narrative Fit</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:13px;color:{MANTLE_TEXT};line-height:1.7">{analysis.get("narrative_fit","")}</div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown(f'<div style="font-size:12px;font-weight:700;color:{MANTLE_MUTED};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">✍️ Content Quality</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:13px;color:{MANTLE_TEXT};line-height:1.7">{analysis.get("content_quality","")}</div>', unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-top:14px'></div>", unsafe_allow_html=True)
+    c3, c4, c5 = st.columns(3)
+    with c3:
+        st.markdown(f'<div style="font-size:12px;font-weight:700;color:{MANTLE_GREEN};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">✅ Strengths</div>', unsafe_allow_html=True)
+        for s in analysis.get("strengths", []):
+            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#0A2E14;border-radius:6px;margin-bottom:6px;line-height:1.5">• {s}</div>', unsafe_allow_html=True)
+    with c4:
+        st.markdown(f'<div style="font-size:12px;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">⚠️ Weaknesses</div>', unsafe_allow_html=True)
+        for w in analysis.get("weaknesses", []):
+            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#2e0a0a;border-radius:6px;margin-bottom:6px;line-height:1.5">• {w}</div>', unsafe_allow_html=True)
+    with c5:
+        st.markdown(f'<div style="font-size:12px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">💡 Recommendations</div>', unsafe_allow_html=True)
+        for rec in analysis.get("recommendations", []):
+            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#2e1f0a;border-radius:6px;margin-bottom:6px;line-height:1.5">• {rec}</div>', unsafe_allow_html=True)
     """Call Claude API to summarize content themes and narratives"""
     if not anthropic_key or not tweets_text_list:
         return None
@@ -726,24 +838,30 @@ def tab_mantle(token):
                   </div>
                 </div>""", unsafe_allow_html=True)
 
-    # Top posts split
-    top_views, top_eng_list = split_top_posts(tweets, n=5)
-    st.markdown('<div class="section-title">Top Posts</div>', unsafe_allow_html=True)
-    col_v, col_e = st.columns(2)
-    with col_v:
-        st.markdown(f'<div style="font-size:12px;font-weight:800;color:{MANTLE_GREEN};margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">👁 Top 5 by Views</div>', unsafe_allow_html=True)
-        if top_views:
-            for i, t in enumerate(top_views, 1):
-                render_post(t, i, MANTLE_GREEN, chain_name="Mantle", is_user=False)
-        else:
-            st.info("No posts found.")
-    with col_e:
-        st.markdown(f'<div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em">⚡ Top 5 by Engagement</div>', unsafe_allow_html=True)
-        if top_eng_list:
-            for i, t in enumerate(top_eng_list, 1):
-                render_post(t, i, "#f59e0b", chain_name="Mantle", is_user=False)
-        else:
-            st.info("No additional posts.")
+    # AI Social Expert Analysis
+    st.markdown('<div class="section-title">AI Social Expert Analysis</div>', unsafe_allow_html=True)
+    if not anthropic_key:
+        st.warning("Add ANTHROPIC_API_KEY to Streamlit Secrets to enable AI analysis.")
+    else:
+        nar_summary = ", ".join([f"{n}: {c} posts" for n,c in sorted(nar_counts.items(), key=lambda x:-x[1])[:5]])
+        metrics_data = {
+            "post_count": post_count,
+            "total_views": total_views,
+            "total_likes": total_likes,
+            "total_rts": total_rts,
+            "eng_rate": eng_rate,
+            "followers": followers,
+            "view_delta": view_delta,
+            "post_delta": post_delta,
+            "narratives": nar_summary,
+        }
+        with st.spinner("Running AI social analysis…"):
+            analysis = ai_social_expert_analysis(
+                tuple(tweets),
+                metrics_data,
+                anthropic_key
+            )
+        render_social_expert_analysis(analysis)
 
     # Export report
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
