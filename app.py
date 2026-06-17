@@ -560,26 +560,52 @@ def check_alerts(tweets, chain_name="Mantle"):
     return alerts
 
 def render_alerts(alerts, chain_name, color):
-    if not alerts:
-        return
-    st.markdown(f"""
-    <div style="background:#1a0a00;border:1px solid #f59e0b44;border-radius:10px;padding:12px 16px;margin-bottom:12px">
-      <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px">
-        🔔 {len(alerts)} HIGH-PERFORMANCE POST{'S' if len(alerts)>1 else ''} DETECTED — {chain_name.upper()}
-      </div>""", unsafe_allow_html=True)
-    for alert_type, t, val in alerts[:3]:
-        text = t.get("text","")[:120] + "…"
-        metric = f"{fmt(val)} views" if alert_type == "views" else f"{fmt(val)} engagement"
+    if not alerts: return
+    items = []
+    for alert_type, t, val in alerts[:5]:
+        text = t.get("text","")[:80].replace('"',"'") + "…"
+        metric = f"{fmt(val)} views" if alert_type == "views" else f"{fmt(val)} eng"
         tid = t.get("id","")
-        handle = {"Mantle":"Mantle_Official","Solana":"solana","Base":"base"}.get(chain_name, chain_name)
+        handle = {"Mantle":"Mantle_Official","Solana":"solana","Base":"base","Ondo":"OndoFinance"}.get(chain_name, chain_name)
         link = f"https://x.com/{handle}/status/{tid}"
-        st.markdown(f"""
-      <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:6px;padding:8px;background:{MANTLE_SURFACE};border-radius:6px">
-        <span style="color:#f59e0b;font-weight:700">{metric}</span> &nbsp;·&nbsp;
-        <span style="color:{MANTLE_TEXT}">{text}</span>
-        <a href="{link}" target="_blank" style="color:#f59e0b;margin-left:8px;font-weight:600">View ↗</a>
-      </div>""", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        items.append({"text": text, "metric": metric, "link": link, "type": alert_type})
+
+    items_js = str(items).replace("'", '"').replace('True','true').replace('False','false')
+    uid = abs(hash(chain_name + str(len(alerts)))) % 99999
+
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span style="background:{color}22;color:{color};border:1px solid {color}44;
+            padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;
+            white-space:nowrap;flex-shrink:0">
+        🔔 {chain_name.upper()}
+      </span>
+      <div id="alert_{uid}" style="font-size:12px;color:{MANTLE_TEXT};
+           opacity:0;transition:opacity 0.6s ease;flex:1;min-width:0;
+           white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+      </div>
+    </div>
+    <script>
+    (function(){{
+      var items = {items_js};
+      var el = document.getElementById('alert_{uid}');
+      if(!el) return;
+      var idx = 0;
+      function show(){{
+        var item = items[idx % items.length];
+        el.style.opacity = '0';
+        setTimeout(function(){{
+          var icon = item.type === 'views' ? '👁' : '⚡';
+          el.innerHTML = icon + ' <b style="color:#f59e0b">' + item.metric + '</b> &nbsp;·&nbsp; ' + item.text + ' &nbsp;<a href="' + item.link + '" target="_blank" style="color:{color};font-weight:600;font-size:11px">View ↗</a>';
+          el.style.opacity = '1';
+          idx++;
+          setTimeout(show, 4000);
+        }}, 400);
+      }}
+      show();
+    }})();
+    </script>
+    """, unsafe_allow_html=True)
 
 # ── FEATURE: COMPETITOR GAP ANALYSIS ─────────────────────────────────────────
 def render_gap_analysis(all_data):
