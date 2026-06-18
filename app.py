@@ -1508,16 +1508,17 @@ def tab_intel(token):
         "Market Intelligence Feed",
         "Aggregates signals from research firms, chain ecosystems, and institutional accounts. AI analyzes key narratives, alpha signals, institutional moves, and top impactful news of the week.",
         ["Research accounts","Chain officials","Institutional signals"],
-        "Last 7 days (X API limit)"
+        "Custom date range (user-selected, max 7 days due to X API limit)"
     )
 
-    si, ei = search_iso()
+    start, end, _ = date_controls("t4")
+    start_iso, end_iso = iso_range(start, end)
     anthropic_key = get_anthropic_key()
 
     # Fetch all intel tweets
     total_accounts = sum(len(v) for v in INTEL_ACCOUNTS.values())
     with st.spinner(f"Fetching data from {total_accounts} accounts across Research, Chains & Institutional…"):
-        all_tweets = fetch_intel_tweets(token, si, ei)
+        all_tweets = fetch_intel_tweets(token, start_iso, end_iso)
 
     st.caption(f"Fetched {len(all_tweets)} posts from {total_accounts} accounts · Last 7 days")
 
