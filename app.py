@@ -156,23 +156,30 @@ Provide analysis in this exact JSON (keep each string under 120 words):
 
 Be specific, reference actual post content. JSON only."""
 
-    try:
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
-                  "messages": [{"role": "user", "content": prompt}]},
-            timeout=40
-        )
-        if r.status_code == 200:
-            import json, re
-            raw = r.json()["content"][0]["text"].strip()
-            raw = re.sub(r'^```(?:json)?\s*', '', raw)
-            raw = re.sub(r'\s*```$', '', raw)
-            return json.loads(raw.strip())
-        return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
-    except Exception as e:
-        return {"_error": str(e)}
+    import time, json, re as re2
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=40
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re2.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re2.sub(r'\s*```$', '', raw)
+                return json.loads(raw.strip())
+            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
+        except Exception as e:
+            if attempt == 2:
+                return {"_error": str(e)}
+            time.sleep(10)
+    return {"_error": "Rate limit — please wait 1 min and refresh"}
 
 def render_content_comparison(analysis):
     if not analysis: return
@@ -265,33 +272,30 @@ TOP POSTS:
 Return ONLY this JSON (no markdown, keep each string under 100 words):
 {{"overall_score":"Good or Average or Needs Improvement","overall_assessment":"assessment here","engagement_analysis":"analysis here","content_quality":"quality here","narrative_fit":"fit here","strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"recommendations":["r1","r2","r3"]}}"""
 
-    try:
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": anthropic_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 1500,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=30
-        )
-        if r.status_code == 200:
-            import json, re
-            raw = r.json()["content"][0]["text"].strip()
-            # strip markdown code fences if present
-            raw = re.sub(r'^```(?:json)?\s*', '', raw)
-            raw = re.sub(r'\s*```$', '', raw)
-            raw = raw.strip()
-            return json.loads(raw)
-        else:
+    import time, json, re as re3
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=30
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re3.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re3.sub(r'\s*```$', '', raw)
+                return json.loads(raw.strip())
             return {"_error": f"HTTP {r.status_code}: {r.text[:300]}"}
-    except Exception as e:
-        return {"_error": str(e)}
+        except Exception as e:
+            if attempt == 2:
+                return {"_error": str(e)}
+            time.sleep(10)
+    return {"_error": "Rate limit — please wait 1 min and refresh"}
 
 def render_social_expert_analysis(analysis):
     if not analysis:
