@@ -1360,7 +1360,6 @@ def tab_competitive(token):
                 anthropic_key
             )
         render_content_comparison(comparison)
-    render_gap_analysis(all_data)
 
     # Top posts per chain
     st.markdown('<div class="section-title">Top Official Posts by Chain</div>', unsafe_allow_html=True)
