@@ -332,15 +332,15 @@ def render_social_expert_analysis(analysis):
     with c3:
         st.markdown(f'<div style="font-size:12px;font-weight:700;color:{MANTLE_GREEN};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">✅ Strengths</div>', unsafe_allow_html=True)
         for s in analysis.get("strengths", []):
-            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#0A2E14;border-radius:6px;margin-bottom:6px;line-height:1.5">• {s}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#E0F5EC;border:1px solid #00A57233;border-radius:6px;margin-bottom:6px;line-height:1.5">• {s}</div>', unsafe_allow_html=True)
     with c4:
         st.markdown(f'<div style="font-size:12px;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">⚠️ Weaknesses</div>', unsafe_allow_html=True)
         for w in analysis.get("weaknesses", []):
-            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#2e0a0a;border-radius:6px;margin-bottom:6px;line-height:1.5">• {w}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#FEE2E2;border:1px solid #f8717133;border-radius:6px;margin-bottom:6px;line-height:1.5">• {w}</div>', unsafe_allow_html=True)
     with c5:
         st.markdown(f'<div style="font-size:12px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">💡 Recommendations</div>', unsafe_allow_html=True)
         for rec in analysis.get("recommendations", []):
-            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#2e1f0a;border-radius:6px;margin-bottom:6px;line-height:1.5">• {rec}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:12px;color:{MANTLE_TEXT};padding:6px 10px;background:#FEF3C7;border:1px solid #f59e0b33;border-radius:6px;margin-bottom:6px;line-height:1.5">• {rec}</div>', unsafe_allow_html=True)
 
 def get_token():
     try: return st.secrets["TWITTER_BEARER_TOKEN"]
@@ -839,7 +839,7 @@ section[data-testid="stSidebar"]{{display:none;}}
 .tab-desc{{background:#E8F5EE;border:1px solid #C8EAD8;border-radius:10px;padding:14px 18px;margin-bottom:16px;}}
 .tab-desc-title{{font-size:13px;font-weight:700;color:{MANTLE_GREEN};margin-bottom:6px;}}
 .tab-desc-body{{font-size:12px;color:{MANTLE_MUTED};line-height:1.6;}}
-.tab-desc-body b{{color:{MANTLE_TEXT};}}
+.tab-desc-body b{{color:#0D3320;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -912,7 +912,7 @@ def tab_mantle(token):
                                       overlaying="y", side="right", showgrid=False, zeroline=False,
                                       tickfont=dict(color="#f59e0b")),
                           title=dict(text=f"Views & Engagement by {period} — @Mantle_Official",
-                                     font=dict(size=13, color="#E0F5EC"), x=0))
+                                     font=dict(size=13, color="#0D3320"), x=0))
         st.plotly_chart(fig, use_container_width=True)
 
     # Narrative breakdown
@@ -1064,7 +1064,7 @@ def tab_competitive(token):
                                      hovertemplate=f"{name}: " + "%{y:,}<extra></extra>"))
     fig.update_layout(**BASE_LAYOUT, height=280, xaxis=AXIS, yaxis=AXIS,
                       title=dict(text=f"Views by {period} — all chains",
-                                 font=dict(size=13, color="#E0F5EC"), x=0))
+                                 font=dict(size=13, color="#0D3320"), x=0))
     st.plotly_chart(fig, use_container_width=True)
 
     # Narrative Breakdown by Chain — RIGHT AFTER VIEWS CHART
@@ -1249,7 +1249,7 @@ def tab_research(token):
         fb.update_layout(**BASE_LAYOUT, height=240, showlegend=False,
                          xaxis=AXIS, yaxis=dict(**AXIS, ticksuffix="%"),
                          title=dict(text=f"Narrative distribution — {len(filtered)} posts",
-                                    font=dict(size=13, color="#E0F5EC"), x=0))
+                                    font=dict(size=13, color="#0D3320"), x=0))
         st.plotly_chart(fb, use_container_width=True)
 
     st.markdown('<div class="section-title">Top 15 Research Posts by Views</div>', unsafe_allow_html=True)
