@@ -708,7 +708,7 @@ def kpi(col, label, value, delta=None, sub=None, color=MANTLE_GREEN):
 def render_post(t, rank, color, chain_name=None, is_user=False):
     m = t.get("public_metrics", {})
     text = t.get("text", "")
-    brief = text[:200] + ("…" if len(text) > 200 else "")
+    brief = text[:120] + ("…" if len(text) > 120 else "")
     imp = get_imp(t)
     tid = t.get("id", "")
     if is_user:
@@ -720,35 +720,32 @@ def render_post(t, rank, color, chain_name=None, is_user=False):
     link = f"https://x.com/{handle}/status/{tid}" if tid else "#"
     ago = time_ago(t.get("created_at", ""))
     narrs = detect_nar(text)
-    badge = f'<span class="narrative-pill" style="background:{color}22;color:{color};border:1px solid {color}44;font-size:10px;padding:2px 8px;border-radius:99px">{chain_name}</span>' if chain_name else ""
-    pills = " ".join([f'<span class="narrative-pill" style="background:{get_nar_color(n)}22;color:{get_nar_color(n)};border:1px solid {get_nar_color(n)}33">{n}</span>' for n in narrs])
-    fstr = f" · {fmt(followers)} followers" if followers else ""
+    badge = f'<span class="narrative-pill" style="background:{color}22;color:{color};border:1px solid {color}44;font-size:9px;padding:1px 6px;border-radius:99px">{chain_name}</span>' if chain_name else ""
+    pills = " ".join([f'<span class="narrative-pill" style="background:{get_nar_color(n)}22;color:{get_nar_color(n)};border:1px solid {get_nar_color(n)}33;font-size:9px;padding:1px 6px">{n}</span>' for n in narrs])
+    fstr = f" · {fmt(followers)} flw" if followers else ""
     st.markdown(f"""
-    <div class="post-card">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-          <span style="font-size:16px;font-weight:800;color:#333;min-width:24px">#{rank}</span>
-          <div>
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-              {badge}<span class="post-handle">@{handle}</span>
-              <span class="post-meta">{ago}{fstr}</span>
-            </div>
-          </div>
+    <div class="post-card" style="padding:10px 12px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
+          <span style="font-size:13px;font-weight:800;color:#aaa;min-width:20px">#{rank}</span>
+          {badge}
+          <span style="font-size:12px;font-weight:700;color:{MANTLE_TEXT};white-space:nowrap">@{handle}</span>
+          <span style="font-size:10px;color:{MANTLE_MUTED};white-space:nowrap">{ago}{fstr}</span>
+          {pills}
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:14px;font-weight:800;color:{color}">{fmt(imp)}</div>
-          <div style="font-size:10px;color:{MANTLE_MUTED}">views</div>
+          <span style="font-size:13px;font-weight:800;color:{color}">{fmt(imp)}</span>
+          <span style="font-size:9px;color:{MANTLE_MUTED}"> views</span>
         </div>
       </div>
-      <div class="post-text">{brief}</div>
-      <div style="margin-bottom:8px">{pills}</div>
+      <div style="font-size:11px;color:#4A7A5A;line-height:1.45;margin-bottom:6px">{brief}</div>
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:12px;color:{MANTLE_MUTED}">
+        <div style="font-size:10px;color:{MANTLE_MUTED}">
           ♥ {fmt(m.get("like_count",0))} &nbsp;·&nbsp;
           ↺ {fmt(m.get("retweet_count",0))} &nbsp;·&nbsp;
           💬 {fmt(m.get("reply_count",0))}
         </div>
-        <a href="{link}" target="_blank" style="font-size:11px;color:{color};text-decoration:none;padding:4px 12px;border:1px solid {color}44;border-radius:6px;white-space:nowrap;background:{color}11;font-weight:600">View ↗</a>
+        <a href="{link}" target="_blank" style="font-size:10px;color:{color};text-decoration:none;padding:2px 8px;border:1px solid {color}44;border-radius:5px;background:{color}11;font-weight:600">View ↗</a>
       </div>
     </div>""", unsafe_allow_html=True)
 
