@@ -758,7 +758,100 @@ def render_gap_analysis(all_data):
         </div>""", unsafe_allow_html=True)
 
 # ── FEATURE: EXPORT HTML REPORT ───────────────────────────────────────────────
-def generate_pdf_report(tab_name, date_range, kpis, top_posts, narratives):
+def generate_html_report(tab_name, date_range, kpis, top_posts, narratives):
+    """Generate HTML report matching dashboard style"""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
+
+    # KPI cards
+    kpi_cards = "".join([f"""
+    <div style="background:#fff;border:1px solid #C8EAD8;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,165,114,0.08)">
+      <div style="font-size:11px;color:#4A7A5A;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-weight:600">{k}</div>
+      <div style="font-size:24px;font-weight:800;color:#00A572">{v}</div>
+    </div>""" for k,v in kpis.items()])
+
+    # Narrative pills
+    nar_items = sorted(narratives.items(), key=lambda x:-x[1])[:10]
+    total_nar = sum(v for _,v in nar_items) or 1
+    nar_bars = "".join([f"""
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="width:120px;font-size:12px;color:#0D3320;font-weight:500">{n}</div>
+      <div style="flex:1;background:#E8F5EE;border-radius:4px;height:8px">
+        <div style="width:{c/total_nar*100:.0f}%;background:#00A572;border-radius:4px;height:8px"></div>
+      </div>
+      <div style="font-size:12px;color:#4A7A5A;min-width:60px">{c} posts · {c/total_nar*100:.0f}%</div>
+    </div>""" for n,c in nar_items])
+
+    # Top posts
+    posts_html = ""
+    for i, t in enumerate(top_posts[:15], 1):
+        m = t.get("public_metrics", {})
+        text = t.get("text","")[:250].replace("<","&lt;").replace(">","&gt;").replace("\n"," ")
+        handle = t.get("author_handle","") or {"Mantle":"Mantle_Official","Solana":"solana","Base":"base","Ondo":"OndoFinance"}.get(t.get("chain",""), "")
+        tid = t.get("id","")
+        link = f"https://x.com/{handle}/status/{tid}" if tid else "#"
+        views = fmt(get_imp(t))
+        likes = fmt(m.get("like_count",0))
+        rts = fmt(m.get("retweet_count",0))
+        nar = t.get("narrative","")
+        nar_color = get_nar_color(nar) if nar else "#6b7280"
+        ago = time_ago(t.get("created_at","")) if t.get("created_at") else ""
+        posts_html += f"""
+        <div style="background:#fff;border:1px solid #C8EAD8;border-radius:10px;padding:16px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px;font-weight:800;color:#C8EAD8">#{i}</span>
+              <span style="font-size:13px;font-weight:700;color:#0D3320">@{handle}</span>
+              <span style="font-size:11px;color:#4A7A5A">{ago}</span>
+              {f'<span style="background:{nar_color}22;color:{nar_color};border:1px solid {nar_color}44;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600">{nar}</span>' if nar else ''}
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:14px;font-weight:800;color:#00A572">{views}</div>
+              <div style="font-size:10px;color:#4A7A5A">views</div>
+            </div>
+          </div>
+          <div style="font-size:13px;color:#4A7A5A;line-height:1.55;margin-bottom:10px">{text}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:12px;color:#4A7A5A">♥ {likes} &nbsp;·&nbsp; ↺ {rts}</div>
+            <a href="{link}" target="_blank" style="font-size:11px;color:#00A572;text-decoration:none;padding:4px 12px;border:1px solid #00A57244;border-radius:6px;background:#00A57211;font-weight:600">View on X ↗</a>
+          </div>
+        </div>"""
+
+    html = f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mantle Social Intelligence — {tab_name}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0;}}
+  body{{font-family:'Inter',sans-serif;background:#F0FAF5;color:#0D3320;padding:32px;}}
+  .header{{display:flex;align-items:center;gap:16px;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #C8EAD8;}}
+  .header h1{{font-size:24px;font-weight:800;color:#0D3320;}}
+  .header .meta{{font-size:12px;color:#4A7A5A;margin-top:4px;}}
+  .section-title{{font-size:13px;font-weight:800;color:#0D3320;text-transform:uppercase;letter-spacing:.12em;margin:20px 0 12px;padding-bottom:8px;border-bottom:2px solid #C8EAD8;}}
+  .kpi-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:8px;}}
+  .generated{{font-size:11px;color:#4A7A5A;margin-top:4px;}}
+</style>
+</head><body>
+<div class="header">
+  <div>
+    <h1>Mantle Social Intelligence</h1>
+    <div class="meta">{tab_name} &nbsp;·&nbsp; {date_range}</div>
+    <div class="generated">Generated: {now}</div>
+  </div>
+</div>
+
+<div class="section-title">Key Metrics</div>
+<div class="kpi-grid">{kpi_cards}</div>
+
+<div class="section-title">Narrative Breakdown</div>
+<div style="background:#fff;border:1px solid #C8EAD8;border-radius:10px;padding:16px;">{nar_bars}</div>
+
+<div class="section-title">Top Posts by Views</div>
+{posts_html}
+
+</body></html>"""
+    return html
     """Generate a PDF report using reportlab"""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
@@ -1087,16 +1180,15 @@ def tab_mantle(token):
 
     # Export report
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
-    if st.button("📥 Download PDF Report — Mantle", key="export_t1"):
-        with st.spinner("Generating PDF…"):
-            pdf = generate_pdf_report(
+    if st.button("📥 Download HTML Report — Mantle", key="export_t1"):
+        html = generate_html_report(
                 "Mantle Deep Dive", f"{start} to {end}",
                 {"Followers": fmt(followers), "Posts": str(post_count),
                  "Total Views": fmt(total_views), "Eng. Rate": f"{eng_rate:.2f}%"},
                 tweets, nar_counts
             )
-        st.download_button("💾 Save PDF", pdf, file_name=f"mantle_report_{start}_{end}.pdf",
-                           mime="application/pdf", key="dl_t1")
+        st.download_button("💾 Save Report", html, file_name=f"mantle_report_{start}_{end}.html",
+                           mime="text/html", key="dl_t1")
 
 
 # ── TAB 2 ────────────────────────────────────────────────────────────────────
@@ -1278,22 +1370,21 @@ def tab_competitive(token):
 
     # Export
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
-    if st.button("📥 Download PDF Report — Competitive", key="export_t2"):
+    if st.button("📥 Download HTML Report — Competitive", key="export_t2"):
         all_tweets_exp = []
         all_nar_comp = Counter()
         for name, d in all_data.items():
             for t in d["tweets"]: t["chain"] = name
             all_tweets_exp.extend(d["tweets"])
             for t in d["tweets"]: all_nar_comp.update([get_narrative(t)])
-        with st.spinner("Generating PDF…"):
-            pdf = generate_pdf_report(
+        html = generate_html_report(
                 "Competitive Analysis", f"{start} to {end}",
                 {name: fmt(sum(get_imp(t) for t in d["tweets"])) + " views" for name, d in all_data.items()},
                 sorted(all_tweets_exp, key=get_imp, reverse=True),
                 all_nar_comp
             )
-        st.download_button("💾 Save PDF", pdf, file_name=f"competitive_report_{start}_{end}.pdf",
-                           mime="application/pdf", key="dl_t2")
+        st.download_button("💾 Save Report", html, file_name=f"competitive_report_{start}_{end}.html",
+                           mime="text/html", key="dl_t2")
 
 
 # ── TAB 3 ────────────────────────────────────────────────────────────────────
@@ -1364,17 +1455,16 @@ def tab_research(token):
 
     # Export
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
-    if st.button("📥 Download PDF Report — Research", key="export_t3"):
-        with st.spinner("Generating PDF…"):
-            pdf = generate_pdf_report(
+    if st.button("📥 Download HTML Report — Research", key="export_t3"):
+        html = generate_html_report(
                 "Industry Research", f"{start} to {end}",
                 {"Total Posts": str(len(filtered)),
                  "Top Views": fmt(get_imp(sorted_posts[0])) if sorted_posts else "0",
                  "Accounts": str(len(RESEARCH_ACCOUNTS))},
                 sorted_posts, nar_counts
             )
-        st.download_button("💾 Save PDF", pdf, file_name=f"research_report_{start}_{end}.pdf",
-                           mime="application/pdf", key="dl_t3")
+        st.download_button("💾 Save Report", html, file_name=f"research_report_{start}_{end}.html",
+                           mime="text/html", key="dl_t3")
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
@@ -1875,10 +1965,10 @@ def tab_intel(token):
 
     # Export
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
-    if st.button("📥 Download PDF Report — Market Intelligence", key="export_t4"):
+    if st.button("📥 Download HTML Report — Market Intelligence", key="export_t4"):
         with st.spinner("Generating PDF…"):
             nar_counts_intel = Counter(get_narrative(t) for t in all_tweets)
-            pdf = generate_pdf_report(
+            pdf = generate_html_report(
                 "Market Intelligence Feed", f"{start} to {end}",
                 {"Total Posts": str(len(all_tweets)),
                  "High Impact": str(len(high_impact)),
@@ -1887,8 +1977,8 @@ def tab_intel(token):
                 sorted(all_tweets, key=impact_score, reverse=True),
                 nar_counts_intel
             )
-        st.download_button("💾 Save PDF", pdf, file_name=f"intel_report_{start}_{end}.pdf",
-                           mime="application/pdf", key="dl_t4")
+        st.download_button("💾 Save Report", html, file_name=f"intel_report_{start}_{end}.html",
+                           mime="text/html", key="dl_t4")
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
