@@ -1442,8 +1442,9 @@ def tab_competitive(token):
             hovertemplate="%{y}: %{x:.1f}% (%{customdata} posts)<extra></extra>",
             customdata=values,
         ))
+        bl = {k:v for k,v in BASE_LAYOUT.items() if k != "hovermode"}
         fig.update_layout(
-            **BASE_LAYOUT,
+            **bl,
             height=max(160, len(labels)*34),
             showlegend=False,
             margin=dict(l=10, r=120, t=32, b=10),
