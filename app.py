@@ -104,6 +104,31 @@ def get_anthropic_key():
     except: return None
 
 @st.cache_data(ttl=1800)
+def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
+    if not anthropic_key or not tweets_text_list: return None
+    sample = list(tweets_text_list)[:20]
+    combined = "\n---\n".join(sample)
+    prompt = f"""Analyze these tweets from {chain_name}'s official account and respond with JSON only:
+{{"main_themes":["theme1","theme2","theme3"],"top_narrative":"narrative name","top_narrative_reason":"1-2 sentences","content_summary":"2-3 sentences","high_attention_topic":"topic","high_attention_reason":"1-2 sentences"}}
+
+TWEETS:
+{combined}"""
+    try:
+        r = requests.post("https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600,
+                  "messages": [{"role": "user", "content": prompt}]}, timeout=30)
+        if r.status_code == 200:
+            import json, re as re2
+            raw = r.json()["content"][0]["text"].strip()
+            raw = re2.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re2.sub(r'\s*```$', '', raw).strip()
+            return json.loads(raw)
+        return {"_error": f"HTTP {r.status_code}"}
+    except Exception as e:
+        return {"_error": str(e)}
+
+@st.cache_data(ttl=1800)
 def ai_content_comparison(chains_data_tuple, anthropic_key):
     """Compare content quality across chains and give Mantle actionable lessons"""
     if not anthropic_key: return None
