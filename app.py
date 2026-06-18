@@ -1304,9 +1304,10 @@ def main():
 # ── TAB 4 INTELLIGENCE FEED ───────────────────────────────────────────────────
 
 INTEL_ACCOUNTS = {
-    "Research":     ["a16zcrypto","MessariCrypto","TheBlockCo","Delphi_Digital","glassnode","WuBlockchain","CoinDesk","Decrypt_Co"],
-    "Chains":       ["Mantle_Official","solana","base","OndoFinance","ethereum","arbitrum","0xPolygon"],
-    "Institutional":["Coinbase","circle","Ripple","BitcoinMagazine","SkyBridge","RealVision"],
+    "Research & Media": ["a16zcrypto","MessariCrypto","TheBlockCo","Delphi_Digital","glassnode",
+                         "WuBlockchain","CoinDesk","Decrypt_Co","Cointelegraph","BitcoinMagazine"],
+    "Chains":           ["Mantle_Official","solana","base","OndoFinance","ethereum","arbitrum","0xPolygon"],
+    "Institutional":    ["coinbase","circle","Ripple","GrayscaleInvest","paradigm","RealVision","SkyBridge"],
 }
 
 IMPACT_KW = [
@@ -1347,7 +1348,7 @@ def impact_score(t):
 
     # Source credibility — institutional > research > chains
     cat = t.get("author_category","")
-    cred = {"Institutional": 3, "Research": 2, "Chains": 1}.get(cat, 1)
+    cred = {"Institutional": 3, "Research & Media": 2, "Chains": 1}.get(cat, 1)
 
     # Normalize and combine
     reach_score = min(views / 100_000, 10)
@@ -1418,7 +1419,30 @@ JSON only, no markdown."""
             time.sleep(10)
     return {"_error": "Rate limit — wait 1 min and refresh"}
 
-def render_intel_analysis(analysis, all_tweets):
+def find_best_match_tweet(text_signal, all_tweets, category_filter=None):
+    """Find the tweet that best matches an AI-generated signal text"""
+    if not text_signal or not all_tweets:
+        return None
+    signal_words = set(re.findall(r'\b\w{4,}\b', text_signal.lower()))
+    best_tweet = None
+    best_score = 0
+    for t in all_tweets:
+        if category_filter and t.get("author_category") != category_filter:
+            continue
+        tweet_words = set(re.findall(r'\b\w{4,}\b', t.get("text","").lower()))
+        overlap = len(signal_words & tweet_words)
+        if overlap > best_score:
+            best_score = overlap
+            best_tweet = t
+    if best_score >= 2:
+        return best_tweet
+    return None
+
+def tweet_link(t):
+    if not t: return "#"
+    handle = t.get("author_handle","")
+    tid = t.get("id","")
+    return f"https://x.com/{handle}/status/{tid}" if tid else "#"
     if not analysis: return
     if "_error" in analysis:
         st.error(f"AI Error: {analysis['_error']}")
@@ -1467,12 +1491,17 @@ def render_intel_analysis(analysis, all_tweets):
     if inst_list:
         icols = st.columns(min(len(inst_list), 3))
         for col, item in zip(icols, inst_list[:3]):
+            signal_text = f"{item.get('institution_or_signal','')} {item.get('action','')}"
+            matched = find_best_match_tweet(signal_text, all_tweets, "Institutional")
+            link = tweet_link(matched)
+            matched_handle = f"@{matched.get('author_handle','')}" if matched else ""
             with col:
                 st.markdown(f"""
                 <div style="background:#FFFFFF;border:1px solid #C8EAD8;border-left:3px solid #06b6d4;border-radius:8px;padding:12px">
                   <div style="font-size:12px;font-weight:700;color:#0D3320;margin-bottom:4px">{item.get("institution_or_signal","")}</div>
                   <div style="font-size:11px;color:#4A7A5A;margin-bottom:6px">{item.get("action","")}</div>
-                  <div style="font-size:11px;color:#06b6d4;font-weight:600">→ {item.get("implication","")}</div>
+                  <div style="font-size:11px;color:#06b6d4;font-weight:600;margin-bottom:8px">→ {item.get("implication","")}</div>
+                  <a href="{link}" target="_blank" style="font-size:10px;color:#06b6d4;text-decoration:none;padding:3px 10px;border:1px solid #06b6d444;border-radius:6px;background:#06b6d411;font-weight:600">{'↗ ' + matched_handle if matched else '↗ View source'}</a>
                 </div>""", unsafe_allow_html=True)
 
     # Top 5 News
@@ -1480,16 +1509,23 @@ def render_intel_analysis(analysis, all_tweets):
     for i, news in enumerate(analysis.get("top5_news", [])[:5], 1):
         impact = news.get("impact","Medium")
         ic = "#f87171" if impact == "High" else "#f59e0b"
+        signal_text = f"{news.get('headline','')} {news.get('why_impactful','')}"
+        matched = find_best_match_tweet(signal_text, all_tweets)
+        link = tweet_link(matched)
+        matched_handle = f"@{matched.get('author_handle','')}" if matched else ""
         st.markdown(f"""
         <div style="display:flex;gap:12px;align-items:flex-start;background:#FFFFFF;border:1px solid #C8EAD8;border-radius:8px;padding:12px;margin-bottom:6px">
           <span style="font-size:16px;font-weight:800;color:#C8EAD8;min-width:24px">#{i}</span>
           <div style="flex:1">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
               <span style="font-size:13px;font-weight:700;color:#0D3320">{news.get("headline","")}</span>
               <span style="background:{ic}22;color:{ic};border:1px solid {ic}44;padding:1px 8px;border-radius:99px;font-size:10px;font-weight:700">{impact}</span>
             </div>
-            <div style="font-size:11px;color:#4A7A5A;margin-bottom:2px">{news.get("why_impactful","")}</div>
-            <div style="font-size:10px;color:#00A572;font-weight:600">{news.get("source","")}</div>
+            <div style="font-size:11px;color:#4A7A5A;margin-bottom:6px">{news.get("why_impactful","")}</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:10px;color:#00A572;font-weight:600">{news.get("source","")}</span>
+              <a href="{link}" target="_blank" style="font-size:10px;color:#00A572;text-decoration:none;padding:2px 8px;border:1px solid #00A57244;border-radius:6px;background:#00A57211;font-weight:600">↗ {'View · ' + matched_handle if matched else 'View source'}</a>
+            </div>
           </div>
         </div>""", unsafe_allow_html=True)
 
@@ -1499,7 +1535,7 @@ def render_intel_analysis(analysis, all_tweets):
     cols = st.columns(3)
     for i, (col, t) in enumerate(zip(cols * 3, top_posts), 1):
         cat = t.get("author_category","")
-        cat_color = {"Institutional":"#06b6d4","Research":"#8b5cf6","Chains":MANTLE_GREEN}.get(cat,"#6b7280")
+        cat_color = {"Institutional":"#06b6d4","Research & Media":"#8b5cf6","Chains":MANTLE_GREEN}.get(cat,"#6b7280")
         with col:
             render_post(t, i, cat_color, is_user=True)
 
@@ -1533,13 +1569,13 @@ def tab_intel(token):
 
     # Stats row
     k1, k2, k3, k4 = st.columns(4)
-    research_tw = [t for t in all_tweets if t.get("author_category") == "Research"]
+    research_tw = [t for t in all_tweets if t.get("author_category") == "Research & Media"]
     chain_tw = [t for t in all_tweets if t.get("author_category") == "Chains"]
     inst_tw = [t for t in all_tweets if t.get("author_category") == "Institutional"]
     high_impact = [t for t in all_tweets if impact_score(t) >= 5]
 
     kpi(k1, "Total posts", str(len(all_tweets)), sub="all sources")
-    kpi(k2, "Research posts", str(len(research_tw)), sub="a16z, Messari, TheBlock…")
+    kpi(k2, "Research posts", str(len(research_tw)), sub="a16z, Messari, CoinDesk…")
     kpi(k3, "Institutional signals", str(len(inst_tw)), sub="Coinbase, Circle, Ripple…")
     kpi(k4, "High-impact posts", str(len(high_impact)), sub="impact score ≥ 5", color="#f59e0b")
 
@@ -1587,16 +1623,20 @@ def tab_intel(token):
     st.markdown('<div class="section-title">Narrative by Source Category</div>', unsafe_allow_html=True)
     cat_cols = st.columns(3)
     for col, (cat_name, cat_tweets) in zip(cat_cols, [
-        ("Research", research_tw),
+        ("Research & Media", research_tw),
         ("Chains", chain_tw),
         ("Institutional", inst_tw)
     ]):
-        cat_color = {"Institutional":"#06b6d4","Research":"#8b5cf6","Chains":MANTLE_GREEN}.get(cat_name,"#6b7280")
+        cat_color = {"Institutional":"#06b6d4","Research & Media":"#8b5cf6","Chains":MANTLE_GREEN}.get(cat_name,"#6b7280")
         cat_nar = Counter(get_narrative(t) for t in cat_tweets)
         cat_sorted = sorted(cat_nar.items(), key=lambda x:-x[1])[:6]
         cat_total = sum(v for _,v in cat_sorted) or 1
         with col:
-            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{cat_color};margin-bottom:8px;text-transform:uppercase">{cat_name}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{cat_color};margin-bottom:4px;text-transform:uppercase">{cat_name}</div>', unsafe_allow_html=True)
+            # Show account list
+            accs = INTEL_ACCOUNTS.get(cat_name, [])
+            accs_str = " · ".join([f"@{a}" for a in accs])
+            st.markdown(f'<div style="font-size:10px;color:#4A7A5A;margin-bottom:8px;line-height:1.5">{accs_str}</div>', unsafe_allow_html=True)
             if cat_sorted:
                 fp = go.Figure(go.Pie(
                     labels=[n for n,_ in cat_sorted],
