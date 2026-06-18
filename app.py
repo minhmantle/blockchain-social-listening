@@ -1218,20 +1218,19 @@ def tab_competitive(token):
 
     # Chain selector
     all_chain_names = list(CHAIN_COLORS.keys())
+    st.markdown('<div style="font-size:11px;color:#4A7A5A;margin-bottom:6px">📌 Mantle is always included. Select up to 4 competitors to compare (max 5 chains total).</div>', unsafe_allow_html=True)
     selected_chains = st.multiselect(
-        "Select chains to compare (Mantle is always included):",
+        "Select competitors (max 4):",
         options=[c for c in all_chain_names if c != "Mantle"],
         default=[c for c in DEFAULT_CHAINS if c != "Mantle"],
+        max_selections=4,
         key="chain_selector"
     )
-    # Always include Mantle
-    if "Mantle" not in selected_chains:
-        selected_chains = ["Mantle"] + selected_chains
-    else:
-        selected_chains = ["Mantle"] + [c for c in selected_chains if c != "Mantle"]
+    # Always include Mantle first
+    selected_chains = ["Mantle"] + [c for c in selected_chains if c != "Mantle"]
 
     if len(selected_chains) < 2:
-        st.warning("Please select at least one other chain to compare.")
+        st.warning("Please select at least one competitor to compare.")
         return
 
     # Build active chain config
