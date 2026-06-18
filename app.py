@@ -145,7 +145,53 @@ TWEETS:
         return {"_error": str(e)}
 
 @st.cache_data(ttl=1800)
-def ai_content_comparison(chains_data_tuple, anthropic_key):
+def ai_chain_swot(chain_name, tweets_tuple, metrics_tuple, anthropic_key):
+    """Per-chain content SWOT analysis"""
+    if not anthropic_key or not tweets_tuple: return None
+    tweets = list(tweets_tuple)
+    metrics = dict(metrics_tuple)
+
+    samples = "\n".join([
+        f"- [{t.get('narrative','?')}] {t.get('text','')[:150]} (views:{fmt(get_imp(t))}, likes:{fmt(t.get('public_metrics',{}).get('like_count',0))})"
+        for t in sorted(tweets, key=get_imp, reverse=True)[:12]
+    ])
+
+    prompt = f"""You are a senior crypto social media strategist. Analyze @{metrics.get('handle',chain_name)}'s content performance.
+
+METRICS:
+- Posts: {metrics.get('posts',0)} | Total views: {fmt(metrics.get('total_views',0))} | Eng. rate: {metrics.get('eng_rate',0):.2f}% | Followers: {fmt(metrics.get('followers',0))}
+- Views/post: {fmt(metrics.get('vpp',0))} | Top narrative: {metrics.get('top_narrative','—')}
+
+TOP POSTS:
+{samples}
+
+Respond ONLY with this JSON (max 20 words per item):
+{{"strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"improvements":["i1","i2","i3"],"content_style":"1 sentence describing their overall content style and tone"}}
+JSON only."""
+
+    import time, json, re as re5
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=30
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re5.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re5.sub(r'\s*```$', '', raw)
+                return json.loads(raw.strip())
+            return {"_error": f"HTTP {r.status_code}"}
+        except Exception as e:
+            if attempt == 2: return {"_error": str(e)}
+            time.sleep(10)
+    return None
     """Compare content quality across chains and give Mantle actionable lessons"""
     if not anthropic_key: return None
     chains_data = dict(chains_data_tuple)
@@ -196,6 +242,32 @@ Be specific, reference actual post content. JSON only."""
                 return {"_error": str(e)}
             time.sleep(10)
     return {"_error": "Rate limit — please wait 1 min and refresh"}
+
+def render_chain_swot(name, swot, color):
+    if not swot: return
+    if "_error" in swot:
+        st.error(f"AI Error: {swot['_error']}")
+        return
+    style = swot.get("content_style","")
+    st.markdown(f"""
+    <div style="background:#FFFFFF;border:1px solid {color}33;border-left:3px solid {color};border-radius:8px;padding:10px 14px;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:800;color:{color};text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">{name}</div>
+      <div style="font-size:11px;color:#4A7A5A;font-style:italic;margin-bottom:10px">{style}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#00A572;margin-bottom:4px">✅ Strengths</div>
+          {''.join([f'<div style="font-size:11px;color:#0D3320;padding:3px 0;border-bottom:1px solid #E8F5EE">• {s}</div>' for s in swot.get('strengths',[])])}
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#f87171;margin-bottom:4px">⚠️ Weaknesses</div>
+          {''.join([f'<div style="font-size:11px;color:#0D3320;padding:3px 0;border-bottom:1px solid #FEE2E2">• {w}</div>' for w in swot.get('weaknesses',[])])}
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-bottom:4px">💡 Improvements</div>
+          {''.join([f'<div style="font-size:11px;color:#0D3320;padding:3px 0;border-bottom:1px solid #FEF3C7">• {i}</div>' for i in swot.get('improvements',[])])}
+        </div>
+      </div>
+    </div>""", unsafe_allow_html=True)
 
 def render_content_comparison(analysis):
     if not analysis: return
@@ -1361,7 +1433,43 @@ def tab_competitive(token):
             )
         render_content_comparison(comparison)
 
-    # Top posts per chain
+    # Per-chain Content SWOT
+    st.markdown('<div class="section-title">📋 Content Strengths & Weaknesses by Chain</div>', unsafe_allow_html=True)
+    if not anthropic_key:
+        st.warning("Add ANTHROPIC_API_KEY to enable AI analysis.")
+    else:
+        for name, d in all_data.items():
+            color = d["color"]
+            tweets = d["tweets"]
+            if not tweets:
+                continue
+            total_v = sum(get_imp(t) for t in tweets)
+            total_e = sum(eng(t.get("public_metrics",{})) for t in tweets)
+            eng_rate = round(total_e / total_v * 100, 2) if total_v else 0
+            vpp = round(total_v / len(tweets)) if tweets else 0
+            followers = d["user"].get("public_metrics",{}).get("followers_count",0) or 0
+            top_nar = Counter(get_narrative(t) for t in tweets).most_common(1)
+            top_nar_name = top_nar[0][0] if top_nar else "—"
+
+            metrics_t = tuple({
+                "handle": d["handle"],
+                "posts": len(tweets),
+                "total_views": total_v,
+                "eng_rate": eng_rate,
+                "followers": followers,
+                "vpp": vpp,
+                "top_narrative": top_nar_name,
+            }.items())
+
+            with st.spinner(f"Analyzing {name}…"):
+                swot = ai_chain_swot(
+                    name,
+                    tuple({"text": t.get("text",""), "narrative": t.get("narrative",""),
+                           "public_metrics": t.get("public_metrics",{})} for t in tweets),
+                    metrics_t,
+                    anthropic_key
+                )
+            render_chain_swot(name, swot, color)
     st.markdown('<div class="section-title">Top Official Posts by Chain</div>', unsafe_allow_html=True)
     for name, d in all_data.items():
         color = d["color"]
