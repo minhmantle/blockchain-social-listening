@@ -103,7 +103,102 @@ def get_anthropic_key():
     except: return None
 
 @st.cache_data(ttl=1800)
-def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
+def ai_content_comparison(chains_data_tuple, anthropic_key):
+    """Compare content quality across chains and give Mantle actionable lessons"""
+    if not anthropic_key: return None
+    chains_data = dict(chains_data_tuple)
+
+    chain_summaries = []
+    for name, data in chains_data.items():
+        tweets = data.get("tweets", [])[:15]
+        top = sorted(tweets, key=lambda t: (t.get("public_metrics",{}).get("impression_count") or 0) or
+                     ((t.get("public_metrics",{}).get("like_count",0) or 0)*100), reverse=True)[:5]
+        samples = "\n".join([f"- [{t.get('narrative','?')}] {t.get('text','')[:120]} (views:{fmt(t.get('public_metrics',{}).get('impression_count') or 0)})" for t in top])
+        followers = data.get("followers", 0)
+        total_views = data.get("total_views", 0)
+        chain_summaries.append(f"=={name}== ({followers:,} followers, {total_views:,} total views)\nTop posts:\n{samples}")
+
+    prompt = f"""You are a senior crypto social media strategist. Compare content performance across these chains:
+
+{chr(10).join(chain_summaries)}
+
+Provide analysis in this exact JSON (keep each string under 120 words):
+{{"winner":"chain name with best content quality","winner_reason":"why they win — specific content strategies, narrative alignment, format choices",
+"ranking":[{{"chain":"name","score":"Excellent/Good/Average/Weak","summary":"2-3 sentences on their content approach and what works"}}],
+"market_momentum_leader":"which chain best captures current market narratives and why",
+"mantle_lessons":[{{"from_chain":"chain name","lesson":"specific actionable thing Mantle should copy or adapt","example":"concrete example from their posts"}}]}}
+
+Be specific, reference actual post content. JSON only."""
+
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=40
+        )
+        if r.status_code == 200:
+            import json, re
+            raw = r.json()["content"][0]["text"].strip()
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+            return json.loads(raw.strip())
+        return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
+    except Exception as e:
+        return {"_error": str(e)}
+
+def render_content_comparison(analysis):
+    if not analysis: return
+    if "_error" in analysis:
+        st.error(f"AI Error: {analysis['_error']}")
+        return
+
+    winner = analysis.get("winner","—")
+    winner_color = CHAIN_COLORS.get(winner, MANTLE_GREEN)
+
+    st.markdown(f"""
+    <div style="background:{winner_color}11;border:1px solid {winner_color}44;border-radius:10px;padding:14px 18px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:800;color:{MANTLE_TEXT}">🏆 Content Quality Winner</span>
+        <span style="background:{winner_color}22;color:{winner_color};border:1px solid {winner_color}44;padding:2px 12px;border-radius:99px;font-size:11px;font-weight:700">{winner}</span>
+      </div>
+      <div style="font-size:13px;color:{MANTLE_TEXT};line-height:1.6;margin-bottom:10px">{analysis.get("winner_reason","")}</div>
+      <div style="font-size:11px;color:{MANTLE_MUTED}">📈 Market momentum leader: <b style="color:{MANTLE_TEXT}">{analysis.get("market_momentum_leader","—")}</b></div>
+    </div>""", unsafe_allow_html=True)
+
+    # Chain rankings
+    ranking = analysis.get("ranking", [])
+    if ranking:
+        st.markdown(f'<div style="font-size:12px;font-weight:700;color:{MANTLE_MUTED};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Content Quality Ranking</div>', unsafe_allow_html=True)
+        score_colors = {"Excellent": MANTLE_GREEN, "Good": "#06b6d4", "Average": "#f59e0b", "Weak": "#f87171"}
+        for i, item in enumerate(ranking, 1):
+            chain = item.get("chain","")
+            score = item.get("score","")
+            summary = item.get("summary","")
+            c = CHAIN_COLORS.get(chain, MANTLE_MUTED)
+            sc = score_colors.get(score, MANTLE_MUTED)
+            st.markdown(f"""
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:10px;background:{MANTLE_SURFACE};border:1px solid {c}33;border-radius:8px;margin-bottom:6px">
+              <span style="font-size:14px;font-weight:800;color:#555;min-width:20px">#{i}</span>
+              <span style="color:{c};font-weight:700;font-size:12px;min-width:60px">{chain}</span>
+              <span style="background:{sc}22;color:{sc};border:1px solid {sc}44;padding:1px 8px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap">{score}</span>
+              <span style="font-size:12px;color:{MANTLE_TEXT};line-height:1.5;flex:1">{summary}</span>
+            </div>""", unsafe_allow_html=True)
+
+    # Lessons for Mantle
+    lessons = analysis.get("mantle_lessons", [])
+    if lessons:
+        st.markdown(f'<div style="font-size:12px;font-weight:700;color:{MANTLE_MUTED};text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px">📚 What Mantle Should Learn</div>', unsafe_allow_html=True)
+        for lesson in lessons:
+            from_chain = lesson.get("from_chain","")
+            lc = CHAIN_COLORS.get(from_chain, MANTLE_MUTED)
+            st.markdown(f"""
+            <div style="background:{MANTLE_SURFACE};border:1px solid {lc}33;border-left:3px solid {lc};border-radius:8px;padding:10px 14px;margin-bottom:8px">
+              <div style="font-size:10px;color:{lc};font-weight:700;margin-bottom:4px">FROM {from_chain.upper()}</div>
+              <div style="font-size:12px;color:{MANTLE_TEXT};font-weight:600;margin-bottom:4px">{lesson.get("lesson","")}</div>
+              <div style="font-size:11px;color:{MANTLE_MUTED};line-height:1.5">💡 {lesson.get("example","")}</div>
+            </div>""", unsafe_allow_html=True)
     """Call Claude API to summarize content themes and narratives"""
     if not anthropic_key or not tweets_text_list:
         return None
@@ -576,9 +671,12 @@ def render_alerts(alerts, chain_name, color):
         </div>""")
 
     rows_html = "".join(rows)
-    st.markdown(f"""
+    st.markdown(f"""<style>
+@keyframes blink{{0%,100%{{opacity:1}}50%{{opacity:0.2}}}}
+.alert-title-{abs(hash(chain_name))%99999}{{animation:blink 1.2s ease infinite;}}
+</style>
     <div style="background:{color}08;border:1px solid {color}33;border-radius:8px;padding:6px 10px;margin-bottom:6px">
-      <div style="font-size:10px;font-weight:800;color:{color};margin-bottom:4px;letter-spacing:.08em">🔔 {chain_name.upper()} — HIGH PERFORMANCE</div>
+      <div class="alert-title-{abs(hash(chain_name))%99999}" style="font-size:10px;font-weight:800;color:{color};margin-bottom:4px;letter-spacing:.08em">🔔 {chain_name.upper()} — HIGH PERFORMANCE</div>
       {rows_html}
     </div>""", unsafe_allow_html=True)
 
@@ -586,57 +684,80 @@ def render_alerts(alerts, chain_name, color):
 def render_gap_analysis(all_data):
     st.markdown('<div class="section-title">Competitor Gap Analysis</div>', unsafe_allow_html=True)
     mantle = all_data.get("Mantle", {})
-    m_views = sum(get_imp(t) for t in mantle.get("tweets", []))
-    m_posts = len(mantle.get("tweets", []))
-    m_eng = sum(eng(t.get("public_metrics",{})) for t in mantle.get("tweets", []))
+    m_tweets = mantle.get("tweets", [])
+    m_views = sum(get_imp(t) for t in m_tweets)
+    m_posts = len(m_tweets)
+    m_eng = sum(eng(t.get("public_metrics",{})) for t in m_tweets)
     m_eng_rate = round(m_eng / m_views * 100, 2) if m_views else 0
+    m_vpp = round(m_views / m_posts) if m_posts else 0  # views per post
+    m_nar = Counter(get_narrative(t) for t in m_tweets)
+    m_total = sum(m_nar.values()) or 1
 
     insights = []
     for name, d in all_data.items():
         if name == "Mantle": continue
-        c_views = sum(get_imp(t) for t in d.get("tweets", []))
-        c_posts = len(d.get("tweets", []))
-        c_eng = sum(eng(t.get("public_metrics",{})) for t in d.get("tweets", []))
-        c_eng_rate = round(c_eng / c_views * 100, 2) if c_views else 0
         color = d["color"]
-
-        if c_views > 0 and m_views > 0:
-            ratio = c_views / m_views
-            if ratio > 1:
-                insights.append((color, name, f"<b>{name}</b> đạt <b>{fmt(c_views)}</b> views vs Mantle <b>{fmt(m_views)}</b> — gấp <b>{ratio:.1f}x</b>. Mantle cần tăng tần suất hoặc chất lượng content."))
-            else:
-                insights.append((MANTLE_GREEN, "Mantle", f"Mantle outperform <b>{name}</b> về views: <b>{fmt(m_views)}</b> vs <b>{fmt(c_views)}</b> — dẫn <b>{1/ratio:.1f}x</b>."))
-
-        if c_eng_rate > 0 and m_eng_rate > 0:
-            if m_eng_rate > c_eng_rate:
-                insights.append((MANTLE_GREEN, "Mantle", f"Mantle có engagement rate cao hơn <b>{name}</b>: <b>{m_eng_rate:.2f}%</b> vs <b>{c_eng_rate:.2f}%</b> — community Mantle engage tốt hơn."))
-            else:
-                diff = c_eng_rate - m_eng_rate
-                insights.append((color, name, f"<b>{name}</b> có engagement rate cao hơn Mantle <b>{diff:.2f}%</b>. Nghiên cứu content format của {name} để tối ưu."))
-
-        # narrative gap
-        m_nar = Counter(get_narrative(t) for t in mantle.get("tweets", []))
-        c_nar = Counter(get_narrative(t) for t in d.get("tweets", []))
-        m_total = sum(m_nar.values()) or 1
+        c_tweets = d.get("tweets", [])
+        c_views = sum(get_imp(t) for t in c_tweets)
+        c_posts = len(c_tweets)
+        c_eng = sum(eng(t.get("public_metrics",{})) for t in c_tweets)
+        c_eng_rate = round(c_eng / c_views * 100, 2) if c_views else 0
+        c_vpp = round(c_views / c_posts) if c_posts else 0
+        c_nar = Counter(get_narrative(t) for t in c_tweets)
         c_total = sum(c_nar.values()) or 1
-        for nar in NARRATIVES:
+
+        # Views per post comparison
+        if c_vpp > 0 and m_vpp > 0:
+            if c_vpp > m_vpp:
+                ratio = c_vpp / m_vpp
+                insights.append((color, "⚠️ Views/Post Gap",
+                    f"<b>{name}</b> averages <b>{fmt(c_vpp)}</b> views/post vs Mantle's <b>{fmt(m_vpp)}</b> — <b>{ratio:.1f}x higher</b>. "
+                    f"Despite Mantle's {m_posts} posts in the period, content reach per post is significantly lower. "
+                    f"Focus on fewer, higher-quality posts rather than volume."))
+            else:
+                ratio = m_vpp / c_vpp
+                insights.append((MANTLE_GREEN, "✅ Views/Post Advantage",
+                    f"Mantle achieves <b>{fmt(m_vpp)}</b> views/post vs {name}'s <b>{fmt(c_vpp)}</b> — <b>{ratio:.1f}x better reach per post</b>. "
+                    f"Content quality and relevance is clearly outperforming."))
+
+        # Engagement rate comparison
+        if c_eng_rate > 0 and m_eng_rate > 0:
+            if c_eng_rate > m_eng_rate:
+                diff = c_eng_rate - m_eng_rate
+                insights.append((color, f"⚠️ Engagement Rate vs {name}",
+                    f"<b>{name}</b> engagement rate: <b>{c_eng_rate:.2f}%</b> vs Mantle: <b>{m_eng_rate:.2f}%</b> (gap: <b>{diff:.2f}%</b>). "
+                    f"Higher engagement rate indicates stronger community resonance and content relevance. "
+                    f"Study {name}'s content format and narrative mix to identify what drives deeper engagement."))
+            else:
+                diff = m_eng_rate - c_eng_rate
+                insights.append((MANTLE_GREEN, f"✅ Engagement Rate vs {name}",
+                    f"Mantle's engagement rate <b>{m_eng_rate:.2f}%</b> outperforms {name} <b>{c_eng_rate:.2f}%</b> by <b>{diff:.2f}%</b>. "
+                    f"Community engagement quality is stronger — leverage this with more interactive content."))
+
+        # Narrative gap
+        for nar in list(NARRATIVES.keys()):
             m_pct = m_nar.get(nar, 0) / m_total * 100
             c_pct = c_nar.get(nar, 0) / c_total * 100
-            if c_pct - m_pct > 15:
-                insights.append((color, name, f"<b>{name}</b> đang nói về <b>{nar}</b> nhiều hơn Mantle ({c_pct:.0f}% vs {m_pct:.0f}%). Đây là narrative gap Mantle có thể khai thác."))
+            if c_pct - m_pct > 20:
+                insights.append((color, f"⚠️ Narrative Gap — {nar}",
+                    f"<b>{name}</b> dedicates <b>{c_pct:.0f}%</b> of content to <b>{nar}</b> vs Mantle's <b>{m_pct:.0f}%</b>. "
+                    f"This {c_pct - m_pct:.0f}% gap suggests {name} is capitalizing on the {nar} narrative more aggressively. "
+                    f"Mantle should increase {nar}-focused content to capture this market conversation."))
                 break
 
     if not insights:
         st.info("Not enough data for gap analysis. Try a wider date range.")
         return
 
-    for color, source, text in insights[:5]:
+    for color, title, text in insights[:6]:
         st.markdown(f"""
         <div style="display:flex;gap:10px;align-items:flex-start;background:{MANTLE_SURFACE};
              border:1px solid {color}33;border-left:3px solid {color};
              border-radius:8px;padding:12px 14px;margin-bottom:8px">
-          <div style="font-size:18px;flex-shrink:0">💡</div>
-          <div style="font-size:12px;color:{MANTLE_TEXT};line-height:1.6">{text}</div>
+          <div style="flex:1">
+            <div style="font-size:10px;font-weight:800;color:{color};text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">{title}</div>
+            <div style="font-size:12px;color:{MANTLE_TEXT};line-height:1.6">{text}</div>
+          </div>
         </div>""", unsafe_allow_html=True)
 
 # ── FEATURE: EXPORT HTML REPORT ───────────────────────────────────────────────
@@ -974,7 +1095,29 @@ def tab_competitive(token):
                 else:
                     st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">Analysis unavailable</div>', unsafe_allow_html=True)
 
-    # Gap analysis
+        # AI Content Comparison
+        st.markdown('<div class="section-title">🏆 AI Content Comparison — Who\'s Doing Better & Why</div>', unsafe_allow_html=True)
+        with st.spinner("Running cross-chain content comparison…"):
+            chains_for_ai = {}
+            for name, d in all_data.items():
+                chains_for_ai[name] = {
+                    "tweets": d["tweets"][:15],
+                    "followers": d["user"].get("public_metrics",{}).get("followers_count",0) or 0,
+                    "total_views": sum(get_imp(t) for t in d["tweets"]),
+                }
+            comparison = ai_content_comparison(
+                tuple((k, {
+                    "tweets": [{
+                        "text": t.get("text",""),
+                        "narrative": t.get("narrative","Other"),
+                        "public_metrics": t.get("public_metrics",{})
+                    } for t in v["tweets"]],
+                    "followers": v["followers"],
+                    "total_views": v["total_views"],
+                }) for k, v in chains_for_ai.items()),
+                anthropic_key
+            )
+        render_content_comparison(comparison)
     render_gap_analysis(all_data)
 
     # Views line chart
