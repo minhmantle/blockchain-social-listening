@@ -1873,6 +1873,23 @@ def tab_intel(token):
             analysis = ai_market_intelligence(tweets_for_ai, anthropic_key)
         render_intel_analysis(analysis, all_tweets)
 
+    # Export
+    st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
+    if st.button("📥 Download PDF Report — Market Intelligence", key="export_t4"):
+        with st.spinner("Generating PDF…"):
+            nar_counts_intel = Counter(get_narrative(t) for t in all_tweets)
+            pdf = generate_pdf_report(
+                "Market Intelligence Feed", f"{start} to {end}",
+                {"Total Posts": str(len(all_tweets)),
+                 "High Impact": str(len(high_impact)),
+                 "Research & Media": str(len(research_tw)),
+                 "Institutional": str(len(inst_tw))},
+                sorted(all_tweets, key=impact_score, reverse=True),
+                nar_counts_intel
+            )
+        st.download_button("💾 Save PDF", pdf, file_name=f"intel_report_{start}_{end}.pdf",
+                           mime="application/pdf", key="dl_t4")
+
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
     token = get_token()
