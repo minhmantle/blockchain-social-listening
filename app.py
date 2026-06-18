@@ -192,28 +192,24 @@ JSON only (max 15 words per field). IMPORTANT: mantle_lessons must include one e
     return {"_error": "Rate limit — wait 1 min and refresh"}
 
 @st.cache_data(ttl=1800)
-def ai_chain_swot(chain_name, tweets_tuple, metrics_tuple, anthropic_key):
-    """Per-chain content SWOT analysis"""
-    if not anthropic_key or not tweets_tuple: return None
-    tweets = list(tweets_tuple)
-    metrics = dict(metrics_tuple)
+def ai_chains_swot_batch(chains_data_tuple, anthropic_key):
+    """Batch SWOT for all chains in one API call"""
+    if not anthropic_key: return {}
+    chains_data = list(chains_data_tuple)
 
-    samples = "\n".join([
-        f"- [{t.get('narrative','?')}] {t.get('text','')[:150]} (views:{fmt(get_imp(t))}, likes:{fmt(t.get('public_metrics',{}).get('like_count',0))})"
-        for t in sorted(tweets, key=get_imp, reverse=True)[:12]
-    ])
+    summaries = []
+    for name, tweets, metrics in chains_data:
+        m = dict(metrics)
+        top = sorted(tweets, key=lambda t: get_imp(t), reverse=True)[:5]
+        samples = " | ".join([f"[{t.get('narrative','?')}] {t.get('text','')[:80]}" for t in top])
+        summaries.append(f"=={name}== {fmt(m.get('followers',0))} followers, {fmt(m.get('total_views',0))} views, eng:{m.get('eng_rate',0):.1f}%, top_nar:{m.get('top_narrative','?')}\nPosts: {samples}")
 
-    prompt = f"""You are a senior crypto social media strategist. Analyze @{metrics.get('handle',chain_name)}'s content performance.
+    prompt = f"""Crypto social media strategist. Analyze content for each chain below.
 
-METRICS:
-- Posts: {metrics.get('posts',0)} | Total views: {fmt(metrics.get('total_views',0))} | Eng. rate: {metrics.get('eng_rate',0):.2f}% | Followers: {fmt(metrics.get('followers',0))}
-- Views/post: {fmt(metrics.get('vpp',0))} | Top narrative: {metrics.get('top_narrative','—')}
+{chr(10).join(summaries)}
 
-TOP POSTS:
-{samples}
-
-Respond ONLY with this JSON (max 20 words per item):
-{{"strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"improvements":["i1","i2","i3"],"content_style":"1 sentence describing their overall content style and tone"}}
+Return JSON with one entry per chain (max 15 words per item):
+{{"chains":[{{"name":"chain","content_style":"1 sentence","strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"improvements":["i1","i2","i3"]}}]}}
 JSON only."""
 
     import time, json, re as re5
@@ -222,9 +218,9 @@ JSON only."""
             r = requests.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600,
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2000,
                       "messages": [{"role": "user", "content": prompt}]},
-                timeout=30
+                timeout=45
             )
             if r.status_code == 429:
                 time.sleep(15)
@@ -233,12 +229,14 @@ JSON only."""
                 raw = r.json()["content"][0]["text"].strip()
                 raw = re5.sub(r'^```(?:json)?\s*', '', raw)
                 raw = re5.sub(r'\s*```$', '', raw)
-                return json.loads(raw.strip())
-            return {"_error": f"HTTP {r.status_code}"}
+                data = json.loads(raw.strip())
+                # Return as dict keyed by chain name
+                return {item["name"]: item for item in data.get("chains", [])}
+            return {}
         except Exception as e:
-            if attempt == 2: return {"_error": str(e)}
+            if attempt == 2: return {}
             time.sleep(10)
-    return None
+    return {}
     """Compare content quality across chains and give Mantle actionable lessons"""
     if not anthropic_key: return None
     chains_data = dict(chains_data_tuple)
@@ -1485,44 +1483,35 @@ def tab_competitive(token):
     if not anthropic_key:
         st.warning("Add ANTHROPIC_API_KEY to enable AI analysis.")
     else:
-        import time as _time
-        for i_chain, (name, d) in enumerate(all_data.items()):
-            color = d["color"]
+        # Build batch data for all chains
+        batch_data = []
+        for name, d in all_data.items():
             tweets = d["tweets"]
-            if not tweets:
-                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED};margin-bottom:6px">{name}: no data available</div>', unsafe_allow_html=True)
-                continue
+            if not tweets: continue
             total_v = sum(get_imp(t) for t in tweets)
             total_e = sum(eng(t.get("public_metrics",{})) for t in tweets)
             eng_rate = round(total_e / total_v * 100, 2) if total_v else 0
-            vpp = round(total_v / len(tweets)) if tweets else 0
             followers = d["user"].get("public_metrics",{}).get("followers_count",0) or 0
             top_nar = Counter(get_narrative(t) for t in tweets).most_common(1)
             top_nar_name = top_nar[0][0] if top_nar else "—"
+            batch_data.append((
+                name,
+                tuple({"text": t.get("text",""), "narrative": t.get("narrative",""),
+                       "public_metrics": t.get("public_metrics",{})} for t in tweets),
+                tuple({"followers": followers, "total_views": total_v,
+                       "eng_rate": eng_rate, "top_narrative": top_nar_name}.items())
+            ))
 
-            metrics_t = tuple({
-                "handle": d["handle"],
-                "posts": len(tweets),
-                "total_views": total_v,
-                "eng_rate": eng_rate,
-                "followers": followers,
-                "vpp": vpp,
-                "top_narrative": top_nar_name,
-            }.items())
+        with st.spinner("Analyzing content for all chains…"):
+            swot_results = ai_chains_swot_batch(tuple(batch_data), anthropic_key)
 
-            # Add delay between chains to avoid rate limit
-            if i_chain > 0:
-                _time.sleep(3)
-
-            with st.spinner(f"Analyzing {name} content…"):
-                swot = ai_chain_swot(
-                    name,
-                    tuple({"text": t.get("text",""), "narrative": t.get("narrative",""),
-                           "public_metrics": t.get("public_metrics",{})} for t in tweets),
-                    metrics_t,
-                    anthropic_key
-                )
-            render_chain_swot(name, swot, color)
+        for name, d in all_data.items():
+            color = d["color"]
+            swot = swot_results.get(name)
+            if swot:
+                render_chain_swot(name, swot, color)
+            elif not d["tweets"]:
+                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED};margin-bottom:6px">{name}: no data</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Top Official Posts by Chain</div>', unsafe_allow_html=True)
     for name, d in all_data.items():
         color = d["color"]
