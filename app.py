@@ -1966,17 +1966,16 @@ def tab_intel(token):
     # Export
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
     if st.button("📥 Download HTML Report — Market Intelligence", key="export_t4"):
-        with st.spinner("Generating PDF…"):
-            nar_counts_intel = Counter(get_narrative(t) for t in all_tweets)
-            pdf = generate_html_report(
-                "Market Intelligence Feed", f"{start} to {end}",
-                {"Total Posts": str(len(all_tweets)),
-                 "High Impact": str(len(high_impact)),
-                 "Research & Media": str(len(research_tw)),
-                 "Institutional": str(len(inst_tw))},
-                sorted(all_tweets, key=impact_score, reverse=True),
-                nar_counts_intel
-            )
+        nar_counts_intel = Counter(get_narrative(t) for t in all_tweets)
+        html = generate_html_report(
+            "Market Intelligence Feed", f"{start} to {end}",
+            {"Total Posts": str(len(all_tweets)),
+             "High Impact": str(len(high_impact)),
+             "Research & Media": str(len(research_tw)),
+             "Institutional": str(len(inst_tw))},
+            sorted(all_tweets, key=impact_score, reverse=True),
+            nar_counts_intel
+        )
         st.download_button("💾 Save Report", html, file_name=f"intel_report_{start}_{end}.html",
                            mime="text/html", key="dl_t4")
 
