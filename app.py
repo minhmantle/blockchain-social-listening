@@ -1420,44 +1420,47 @@ def tab_competitive(token):
                                  font=dict(size=13, color="#0D3320"), x=0))
     st.plotly_chart(fig, use_container_width=True)
 
-    # Narrative Breakdown by Chain — RIGHT AFTER VIEWS CHART
+    # Narrative Breakdown by Chain — 3 per row
     st.markdown('<div class="section-title">Narrative Breakdown by Chain</div>', unsafe_allow_html=True)
-    for name, d in all_data.items():
-        color = d["color"]
-        counts = Counter(get_narrative(t) for t in d["tweets"])
-        sorted_n = sorted(counts.items(), key=lambda x:-x[1])[:8]
-        total = sum(counts.values()) or 1
-        if not sorted_n:
-            continue
-        labels = [n for n,_ in sorted_n]
-        values = [c for _,c in sorted_n]
-        pcts = [c/total*100 for c in values]
-        bar_colors = [get_nar_color(n) for n in labels]
-
-        fig = go.Figure(go.Bar(
-            x=pcts, y=labels, orientation='h',
-            marker_color=bar_colors,
-            text=[f"{p:.0f}%  ({v} posts)" for p,v in zip(pcts,values)],
-            textposition="outside",
-            hovertemplate="%{y}: %{x:.1f}% (%{customdata} posts)<extra></extra>",
-            customdata=values,
-        ))
-        bl = {k:v for k,v in BASE_LAYOUT.items() if k not in ("margin","hovermode","legend")}
-        fig.update_layout(
-            paper_bgcolor="#FFFFFF",
-            plot_bgcolor="#FFFFFF",
-            font=dict(color="#2D6A4F", size=11, family="Inter"),
-            height=max(160, len(labels)*34),
-            showlegend=False,
-            margin=dict(l=10, r=120, t=32, b=10),
-            xaxis=dict(**AXIS, ticksuffix="%", range=[0, max(pcts)*1.35]),
-            yaxis=dict(color="#0D3320", tickfont=dict(color="#0D3320", size=12),
-                       showgrid=False, zeroline=False, autorange="reversed"),
-            title=dict(
-                text=f"<b>{name}</b>  ·  #1 {labels[0]} · {pcts[0]:.0f}%",
-                font=dict(size=13, color=color), x=0)
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    chain_list = list(all_data.items())
+    for row_start in range(0, len(chain_list), 3):
+        row_chains = chain_list[row_start:row_start+3]
+        cols = st.columns(len(row_chains))
+        for col, (name, d) in zip(cols, row_chains):
+            color = d["color"]
+            counts = Counter(get_narrative(t) for t in d["tweets"])
+            sorted_n = sorted(counts.items(), key=lambda x:-x[1])[:6]
+            total = sum(counts.values()) or 1
+            with col:
+                if not sorted_n:
+                    st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">{name}: no data</div>', unsafe_allow_html=True)
+                    continue
+                labels = [n for n,_ in sorted_n]
+                values = [c for _,c in sorted_n]
+                pcts = [c/total*100 for c in values]
+                fig = go.Figure(go.Bar(
+                    x=pcts, y=labels, orientation='h',
+                    marker_color=[get_nar_color(n) for n in labels],
+                    text=[f"{p:.0f}%" for p in pcts],
+                    textposition="outside",
+                    hovertemplate="%{y}: %{x:.1f}% (%{customdata} posts)<extra></extra>",
+                    customdata=values,
+                ))
+                fig.update_layout(
+                    paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
+                    font=dict(color="#2D6A4F", size=10, family="Inter"),
+                    height=max(140, len(labels)*26),
+                    showlegend=False,
+                    margin=dict(l=0, r=50, t=28, b=0),
+                    xaxis=dict(gridcolor="#C8EAD8", showgrid=True, zeroline=False,
+                               tickfont=dict(size=9, color="#2D6A4F"),
+                               ticksuffix="%", range=[0, max(pcts)*1.4]),
+                    yaxis=dict(tickfont=dict(color="#0D3320", size=10),
+                               showgrid=False, zeroline=False, autorange="reversed"),
+                    title=dict(text=f"<b>{name}</b>",
+                               font=dict(size=12, color=color), x=0)
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
     # ── AI Content Comparison (single call, covers all chains) ──────────────
     st.markdown('<div class="section-title">🤖 AI Content Analysis & Comparison</div>', unsafe_allow_html=True)
