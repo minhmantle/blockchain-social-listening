@@ -145,6 +145,53 @@ TWEETS:
         return {"_error": str(e)}
 
 @st.cache_data(ttl=1800)
+def ai_content_comparison(chains_data_tuple, anthropic_key):
+    """Compare content quality across chains and give Mantle actionable lessons"""
+    if not anthropic_key: return None
+    chains_data = dict(chains_data_tuple)
+
+    chain_summaries = []
+    for name, data in chains_data.items():
+        tweets = data.get("tweets", [])[:10]
+        top = sorted(tweets, key=lambda t: (t.get("public_metrics",{}).get("impression_count") or 0) or
+                     ((t.get("public_metrics",{}).get("like_count",0) or 0)*100), reverse=True)[:3]
+        samples = "\n".join([f"- [{t.get('narrative','?')}] {t.get('text','')[:100]}" for t in top])
+        followers = data.get("followers", 0)
+        total_views = data.get("total_views", 0)
+        chain_summaries.append(f"=={name}== ({fmt(followers)} followers, {fmt(total_views)} views)\n{samples}")
+
+    prompt = f"""Senior crypto social media strategist. Compare these chains briefly:
+
+{chr(10).join(chain_summaries)}
+
+JSON only (max 15 words per field):
+{{"winner":"chain","winner_reason":"why","ranking":[{{"chain":"name","score":"Excellent/Good/Average/Weak","summary":"brief"}}],"market_momentum_leader":"chain — why","mantle_lessons":[{{"from_chain":"name","lesson":"what","example":"brief"}}]}}"""
+
+    import time, json, re as re2
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=40
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re2.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re2.sub(r'\s*```$', '', raw)
+                return json.loads(raw.strip())
+            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
+        except Exception as e:
+            if attempt == 2: return {"_error": str(e)}
+            time.sleep(10)
+    return {"_error": "Rate limit — wait 1 min and refresh"}
+
+@st.cache_data(ttl=1800)
 def ai_chain_swot(chain_name, tweets_tuple, metrics_tuple, anthropic_key):
     """Per-chain content SWOT analysis"""
     if not anthropic_key or not tweets_tuple: return None
