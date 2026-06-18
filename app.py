@@ -1,5 +1,4 @@
-import streamlit as st
-import requests
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta, date
@@ -667,14 +666,18 @@ def render_alerts(alerts, chain_name, color):
         rows.append(f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid {color}22;overflow:hidden"><span style="font-size:10px;font-weight:700;color:#f59e0b;white-space:nowrap">{icon} {metric}</span><span style="font-size:11px;color:{MANTLE_MUTED};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{raw_text}</span><a href="{link}" target="_blank" style="color:{color};font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;text-decoration:none">↗ X</a></div>')
 
     rows_html = "".join(rows)
-    st.markdown(f"""<style>
+    html_content = f"""<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+*{{font-family:'Inter',sans-serif;box-sizing:border-box;}}
 @keyframes blink{{0%,100%{{opacity:1}}50%{{opacity:0.2}}}}
-.alert-title-{abs(hash(chain_name))%99999}{{animation:blink 1.2s ease infinite;}}
+.alert-title{{animation:blink 1.2s ease infinite;font-size:10px;font-weight:800;color:{color};margin-bottom:4px;letter-spacing:.08em;}}
+body{{margin:0;padding:0;background:transparent;}}
 </style>
-    <div style="background:{color}08;border:1px solid {color}33;border-radius:8px;padding:6px 10px;margin-bottom:6px">
-      <div class="alert-title-{abs(hash(chain_name))%99999}" style="font-size:10px;font-weight:800;color:{color};margin-bottom:4px;letter-spacing:.08em">🔔 {chain_name.upper()} — HIGH PERFORMANCE</div>
-      {rows_html}
-    </div>""", unsafe_allow_html=True)
+<div style="background:{color}18;border:1px solid {color}44;border-radius:8px;padding:6px 10px;">
+  <div class="alert-title">🔔 {chain_name.upper()} — HIGH PERFORMANCE</div>
+  {rows_html}
+</div>"""
+    components.html(html_content, height=40 + len(rows)*28, scrolling=False)
 
 # ── FEATURE: COMPETITOR GAP ANALYSIS ─────────────────────────────────────────
 def render_gap_analysis(all_data):
