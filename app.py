@@ -1094,48 +1094,12 @@ def tab_competitive(token):
             else:
                 st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>', unsafe_allow_html=True)
 
-    # ── AI Content Summary ────────────────────────────────────────────────────
-    st.markdown('<div class="section-title">🤖 AI Content Analysis</div>', unsafe_allow_html=True)
+    # ── AI Content Comparison (single call, covers all chains) ──────────────
+    st.markdown('<div class="section-title">🤖 AI Content Analysis & Comparison</div>', unsafe_allow_html=True)
     if not anthropic_key:
         st.warning("Add ANTHROPIC_API_KEY to Streamlit Secrets to enable AI analysis.")
     else:
-        ai_cols = st.columns(len(CHAIN_COLORS))
-        for col, (name, d) in zip(ai_cols, all_data.items()):
-            color = d["color"]
-            with col:
-                st.markdown(f'<div style="font-size:12px;font-weight:800;color:{color};margin-bottom:8px;text-transform:uppercase">{name}</div>', unsafe_allow_html=True)
-                if not d["tweets"]:
-                    st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>', unsafe_allow_html=True)
-                    continue
-                with st.spinner(f"Analyzing {name}…"):
-                    texts = [t.get("text","") for t in d["tweets"] if t.get("text","")]
-                    summary = ai_content_summary(name, texts, anthropic_key)
-                if summary:
-                    top_nar = summary.get("top_narrative","—")
-                    nar_color = NARRATIVE_COLORS.get(top_nar, color)
-                    st.markdown(f"""
-                    <div style="background:{MANTLE_SURFACE};border:1px solid {color}33;border-left:3px solid {color};border-radius:8px;padding:12px;margin-bottom:8px">
-                      <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:4px">CONTENT OVERVIEW</div>
-                      <div style="font-size:12px;color:{MANTLE_TEXT};line-height:1.6;margin-bottom:10px">{summary.get("content_summary","—")}</div>
-                      <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:4px">TOP NARRATIVE</div>
-                      <div style="margin-bottom:6px">
-                        <span style="background:{nar_color}22;color:{nar_color};border:1px solid {nar_color}44;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700">{top_nar}</span>
-                      </div>
-                      <div style="font-size:12px;color:{MANTLE_TEXT};line-height:1.6;margin-bottom:10px">{summary.get("top_narrative_reason","—")}</div>
-                      <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:4px">HIGH-ATTENTION TOPIC</div>
-                      <div style="font-size:12px;color:#f59e0b;font-weight:600;margin-bottom:4px">{summary.get("high_attention_topic","—")}</div>
-                      <div style="font-size:12px;color:{MANTLE_TEXT};line-height:1.6">{summary.get("high_attention_reason","—")}</div>
-                    </div>""", unsafe_allow_html=True)
-                    themes = summary.get("main_themes", [])
-                    if themes:
-                        pills = " ".join([f'<span style="background:{color}22;color:{color};border:1px solid {color}33;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600">{th}</span>' for th in themes])
-                        st.markdown(f'<div style="margin-top:4px">{pills}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">Analysis unavailable</div>', unsafe_allow_html=True)
-
-        # AI Content Comparison
-        st.markdown('<div class="section-title">🏆 AI Content Comparison — Who\'s Doing Better & Why</div>', unsafe_allow_html=True)
-        with st.spinner("Running cross-chain content comparison…"):
+        with st.spinner("Running AI content analysis…"):
             chains_for_ai = {}
             for name, d in all_data.items():
                 chains_for_ai[name] = {
