@@ -1435,27 +1435,32 @@ def tab_competitive(token):
                 if not sorted_n:
                     st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">{name}: no data</div>', unsafe_allow_html=True)
                     continue
-                labels = [n for n,_ in sorted_n]
-                values = [c for _,c in sorted_n]
+                # Pad đến đúng 6 bars để mọi chart đồng đều height
+                MAX_BARS = 6
+                sorted_n_padded = sorted_n + [("", 0)] * (MAX_BARS - len(sorted_n))
+                labels = [n for n,_ in sorted_n_padded]
+                values = [c for _,c in sorted_n_padded]
                 pcts = [c/total*100 for c in values]
+                labels_display = [l[:13]+"…" if len(l) > 14 else l for l in labels]
                 fig = go.Figure(go.Bar(
-                    x=pcts, y=labels, orientation='h',
-                    marker_color=[get_nar_color(n) for n in labels],
-                    text=[f"{p:.0f}%" for p in pcts],
+                    x=pcts, y=labels_display, orientation='h',
+                    marker_color=[get_nar_color(n) if n else "rgba(0,0,0,0)" for n in labels],
+                    text=[f"{p:.0f}%" if p > 0 else "" for p in pcts],
                     textposition="outside",
+                    textfont=dict(size=9),
                     hovertemplate="%{y}: %{x:.1f}% (%{customdata} posts)<extra></extra>",
                     customdata=values,
                 ))
                 fig.update_layout(
                     paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
-                    font=dict(color="#2D6A4F", size=10, family="Inter"),
-                    height=max(140, len(labels)*26),
+                    font=dict(color="#2D6A4F", size=9, family="Inter"),
+                    height=240,
                     showlegend=False,
-                    margin=dict(l=0, r=50, t=28, b=0),
+                    margin=dict(l=0, r=44, t=28, b=0),
                     xaxis=dict(gridcolor="#C8EAD8", showgrid=True, zeroline=False,
-                               tickfont=dict(size=9, color="#2D6A4F"),
-                               ticksuffix="%", range=[0, max(pcts)*1.4]),
-                    yaxis=dict(tickfont=dict(color="#0D3320", size=10),
+                               tickfont=dict(size=8, color="#2D6A4F"),
+                               ticksuffix="%", range=[0, max(pcts)*1.45] if max(pcts) > 0 else [0, 100]),
+                    yaxis=dict(tickfont=dict(color="#0D3320", size=9),
                                showgrid=False, zeroline=False, autorange="reversed"),
                     title=dict(text=f"<b>{name}</b>",
                                font=dict(size=12, color=color), x=0)
