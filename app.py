@@ -758,7 +758,115 @@ def render_gap_analysis(all_data):
         </div>""", unsafe_allow_html=True)
 
 # ── FEATURE: EXPORT HTML REPORT ───────────────────────────────────────────────
-def generate_report(tab_name, date_range, kpis, top_posts, narratives):
+def generate_pdf_report(tab_name, date_range, kpis, top_posts, narratives):
+    """Generate a PDF report using reportlab"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER
+    import io
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            leftMargin=20*mm, rightMargin=20*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
+
+    # Colors
+    GREEN = colors.HexColor("#00A572")
+    DARK  = colors.HexColor("#0D3320")
+    MUTED = colors.HexColor("#4A7A5A")
+    LIGHT = colors.HexColor("#E8F5EE")
+    BORDER= colors.HexColor("#C8EAD8")
+
+    styles = getSampleStyleSheet()
+    title_style   = ParagraphStyle("title",   fontSize=20, fontName="Helvetica-Bold", textColor=DARK, spaceAfter=4)
+    sub_style     = ParagraphStyle("sub",     fontSize=10, fontName="Helvetica",      textColor=MUTED, spaceAfter=12)
+    heading_style = ParagraphStyle("heading", fontSize=12, fontName="Helvetica-Bold", textColor=GREEN, spaceBefore=12, spaceAfter=6)
+    body_style    = ParagraphStyle("body",    fontSize=9,  fontName="Helvetica",      textColor=DARK, spaceAfter=4, leading=14)
+    small_style   = ParagraphStyle("small",   fontSize=8,  fontName="Helvetica",      textColor=MUTED, spaceAfter=2)
+
+    story = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
+
+    # Header
+    story.append(Paragraph("Mantle Social Intelligence", title_style))
+    story.append(Paragraph(f"{tab_name} Report &nbsp;·&nbsp; {date_range} &nbsp;·&nbsp; Generated {now}", sub_style))
+    story.append(HRFlowable(width="100%", thickness=1, color=GREEN, spaceAfter=12))
+
+    # KPIs table
+    story.append(Paragraph("Key Metrics", heading_style))
+    kpi_data = [list(kpis.keys()), list(kpis.values())]
+    kpi_table = Table(kpi_data, colWidths=[170/len(kpis)*mm]*len(kpis))
+    kpi_table.setStyle(TableStyle([
+        ("BACKGROUND",  (0,0), (-1,0), LIGHT),
+        ("TEXTCOLOR",   (0,0), (-1,0), MUTED),
+        ("TEXTCOLOR",   (0,1), (-1,1), GREEN),
+        ("FONTNAME",    (0,0), (-1,0), "Helvetica"),
+        ("FONTNAME",    (0,1), (-1,1), "Helvetica-Bold"),
+        ("FONTSIZE",    (0,0), (-1,0), 8),
+        ("FONTSIZE",    (0,1), (-1,1), 14),
+        ("ALIGN",       (0,0), (-1,-1), "CENTER"),
+        ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0,0), (-1,-1), [LIGHT, colors.white]),
+        ("BOX",         (0,0), (-1,-1), 0.5, BORDER),
+        ("INNERGRID",   (0,0), (-1,-1), 0.3, BORDER),
+        ("TOPPADDING",  (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING",(0,0),(-1,-1), 6),
+    ]))
+    story.append(kpi_table)
+    story.append(Spacer(1, 8))
+
+    # Narrative breakdown
+    if narratives:
+        story.append(Paragraph("Narrative Breakdown", heading_style))
+        nar_items = sorted(narratives.items(), key=lambda x:-x[1])[:8]
+        total_nar = sum(v for _,v in nar_items) or 1
+        nar_data = [["Narrative", "Posts", "%"]] + [
+            [n, str(c), f"{c/total_nar*100:.0f}%"] for n,c in nar_items
+        ]
+        nar_table = Table(nar_data, colWidths=[90*mm, 30*mm, 30*mm])
+        nar_table.setStyle(TableStyle([
+            ("BACKGROUND",  (0,0), (-1,0), LIGHT),
+            ("TEXTCOLOR",   (0,0), (-1,0), MUTED),
+            ("FONTNAME",    (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE",    (0,0), (-1,-1), 9),
+            ("ALIGN",       (1,0), (-1,-1), "CENTER"),
+            ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#F8FDF9")]),
+            ("BOX",         (0,0), (-1,-1), 0.5, BORDER),
+            ("INNERGRID",   (0,0), (-1,-1), 0.3, BORDER),
+            ("TOPPADDING",  (0,0), (-1,-1), 5),
+            ("BOTTOMPADDING",(0,0),(-1,-1), 5),
+        ]))
+        story.append(nar_table)
+        story.append(Spacer(1, 8))
+
+    # Top posts
+    if top_posts:
+        story.append(Paragraph("Top Posts by Views", heading_style))
+        for i, t in enumerate(top_posts[:10], 1):
+            m = t.get("public_metrics", {})
+            text = t.get("text","")[:180].replace("<","&lt;").replace(">","&gt;")
+            handle = t.get("author_handle","") or {"Mantle":"Mantle_Official","Solana":"solana","Base":"base"}.get(t.get("chain",""), "")
+            tid = t.get("id","")
+            link = f"https://x.com/{handle}/status/{tid}"
+            views = fmt(get_imp(t))
+            likes = fmt(m.get("like_count",0))
+            nar = t.get("narrative","")
+            story.append(Paragraph(
+                f'<font color="#00A572"><b>#{i}</b></font> '
+                f'<font color="#4A7A5A">@{handle}</font> &nbsp;'
+                f'<font color="#0D3320">{views} views · {likes} likes</font>'
+                + (f' &nbsp;<font color="#8b5cf6">[{nar}]</font>' if nar else ""),
+                body_style))
+            story.append(Paragraph(text, small_style))
+            story.append(Paragraph(f'<link href="{link}"><font color="#00A572">{link}</font></link>', small_style))
+            story.append(Spacer(1, 4))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.read()
     now = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
     posts_html = ""
     for i, t in enumerate(top_posts[:10], 1):
@@ -979,17 +1087,16 @@ def tab_mantle(token):
 
     # Export report
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
-    if st.button("📥 Download HTML Report — Mantle", key="export_t1"):
-        html = generate_report(
-            "Mantle Deep Dive",
-            f"{start} to {end}",
-            {"Followers": fmt(followers), "Posts": str(post_count),
-             "Total Views": fmt(total_views), "Eng. Rate": f"{eng_rate:.2f}%"},
-            tweets,
-            nar_counts
-        )
-        st.download_button("💾 Save Report", html, file_name=f"mantle_report_{start}_{end}.html",
-                           mime="text/html", key="dl_t1")
+    if st.button("📥 Download PDF Report — Mantle", key="export_t1"):
+        with st.spinner("Generating PDF…"):
+            pdf = generate_pdf_report(
+                "Mantle Deep Dive", f"{start} to {end}",
+                {"Followers": fmt(followers), "Posts": str(post_count),
+                 "Total Views": fmt(total_views), "Eng. Rate": f"{eng_rate:.2f}%"},
+                tweets, nar_counts
+            )
+        st.download_button("💾 Save PDF", pdf, file_name=f"mantle_report_{start}_{end}.pdf",
+                           mime="application/pdf", key="dl_t1")
 
 
 # ── TAB 2 ────────────────────────────────────────────────────────────────────
@@ -1171,23 +1278,22 @@ def tab_competitive(token):
 
     # Export
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
-    if st.button("📥 Download HTML Report — Competitive", key="export_t2"):
-        all_tweets = []
+    if st.button("📥 Download PDF Report — Competitive", key="export_t2"):
+        all_tweets_exp = []
         all_nar_comp = Counter()
         for name, d in all_data.items():
-            for t in d["tweets"]:
-                t["chain"] = name
-            all_tweets.extend(d["tweets"])
-            for t in d["tweets"]: all_nar_comp.update(detect_nar(t.get("text","")))
-        html = generate_report(
-            "Competitive Analysis",
-            f"{start} to {end}",
-            {name: fmt(sum(get_imp(t) for t in d["tweets"])) + " views" for name, d in all_data.items()},
-            sorted(all_tweets, key=get_imp, reverse=True),
-            all_nar_comp
-        )
-        st.download_button("💾 Save Report", html, file_name=f"competitive_report_{start}_{end}.html",
-                           mime="text/html", key="dl_t2")
+            for t in d["tweets"]: t["chain"] = name
+            all_tweets_exp.extend(d["tweets"])
+            for t in d["tweets"]: all_nar_comp.update([get_narrative(t)])
+        with st.spinner("Generating PDF…"):
+            pdf = generate_pdf_report(
+                "Competitive Analysis", f"{start} to {end}",
+                {name: fmt(sum(get_imp(t) for t in d["tweets"])) + " views" for name, d in all_data.items()},
+                sorted(all_tweets_exp, key=get_imp, reverse=True),
+                all_nar_comp
+            )
+        st.download_button("💾 Save PDF", pdf, file_name=f"competitive_report_{start}_{end}.pdf",
+                           mime="application/pdf", key="dl_t2")
 
 
 # ── TAB 3 ────────────────────────────────────────────────────────────────────
@@ -1258,18 +1364,17 @@ def tab_research(token):
 
     # Export
     st.markdown('<div class="section-title">Export Report</div>', unsafe_allow_html=True)
-    if st.button("📥 Download HTML Report — Research", key="export_t3"):
-        html = generate_report(
-            "Industry Research",
-            f"{start} to {end}",
-            {"Total Posts": str(len(filtered)),
-             "Top Views": fmt(get_imp(sorted_posts[0])) if sorted_posts else "0",
-             "Accounts": str(len(RESEARCH_ACCOUNTS))},
-            sorted_posts,
-            nar_counts
-        )
-        st.download_button("💾 Save Report", html, file_name=f"research_report_{start}_{end}.html",
-                           mime="text/html", key="dl_t3")
+    if st.button("📥 Download PDF Report — Research", key="export_t3"):
+        with st.spinner("Generating PDF…"):
+            pdf = generate_pdf_report(
+                "Industry Research", f"{start} to {end}",
+                {"Total Posts": str(len(filtered)),
+                 "Top Views": fmt(get_imp(sorted_posts[0])) if sorted_posts else "0",
+                 "Accounts": str(len(RESEARCH_ACCOUNTS))},
+                sorted_posts, nar_counts
+            )
+        st.download_button("💾 Save PDF", pdf, file_name=f"research_report_{start}_{end}.pdf",
+                           mime="application/pdf", key="dl_t3")
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
