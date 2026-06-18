@@ -1520,11 +1520,16 @@ def tab_intel(token):
     with st.spinner(f"Fetching data from {total_accounts} accounts across Research, Chains & Institutional…"):
         all_tweets = fetch_intel_tweets(token, start_iso, end_iso)
 
-    st.caption(f"Fetched {len(all_tweets)} posts from {total_accounts} accounts · Last 7 days")
+    st.caption(f"Fetched {len(all_tweets)} posts from {total_accounts} accounts · {start} → {end}")
 
     if not all_tweets:
         st.warning("No data found. Check API token.")
         return
+
+    # Classify narratives
+    if all_tweets:
+        with st.spinner("Classifying narratives with AI…"):
+            all_tweets = classify_tweets_narratives(all_tweets, anthropic_key)
 
     # Stats row
     k1, k2, k3, k4 = st.columns(4)
@@ -1539,6 +1544,76 @@ def tab_intel(token):
     kpi(k4, "High-impact posts", str(len(high_impact)), sub="impact score ≥ 5", color="#f59e0b")
 
     st.markdown("<div style='margin-top:16px'></div>", unsafe_allow_html=True)
+
+    # Narrative distribution chart
+    st.markdown('<div class="section-title">Narrative Distribution — All Sources</div>', unsafe_allow_html=True)
+    nar_counts = Counter(get_narrative(t) for t in all_tweets)
+    sorted_nar = sorted(nar_counts.items(), key=lambda x:-x[1])
+    total_nar = sum(v for _,v in sorted_nar) or 1
+
+    nc1, nc2 = st.columns([2,1])
+    with nc1:
+        fig_nar = go.Figure(go.Bar(
+            x=[n for n,_ in sorted_nar],
+            y=[c for _,c in sorted_nar],
+            marker_color=[get_nar_color(n) for n,_ in sorted_nar],
+            text=[f"{c/total_nar*100:.0f}%" for _,c in sorted_nar],
+            textposition="outside",
+            hovertemplate="%{x}: %{y} posts (%{text})<extra></extra>",
+        ))
+        fig_nar.update_layout(**BASE_LAYOUT, height=260, showlegend=False,
+                              xaxis=AXIS, yaxis=AXIS,
+                              title=dict(text="Narrative volume across all intelligence sources",
+                                         font=dict(size=13,color="#0D3320"), x=0))
+        st.plotly_chart(fig_nar, use_container_width=True)
+
+    with nc2:
+        st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+        for name, cnt in sorted_nar[:10]:
+            c = get_nar_color(name)
+            pct = cnt / total_nar * 100
+            st.markdown(f"""
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <div style="width:10px;height:10px;border-radius:2px;background:{c};flex-shrink:0"></div>
+              <div style="flex:1;font-size:12px;color:#0D3320;font-weight:500">{name}</div>
+              <div style="font-size:11px;color:#4A7A5A">{cnt} posts</div>
+              <div style="width:60px;background:#C8EAD8;border-radius:4px;height:5px">
+                <div style="width:{pct}%;background:{c};border-radius:4px;height:5px"></div>
+              </div>
+              <div style="font-size:11px;color:{c};font-weight:700;min-width:32px">{pct:.0f}%</div>
+            </div>""", unsafe_allow_html=True)
+
+    # Narrative breakdown by category
+    st.markdown('<div class="section-title">Narrative by Source Category</div>', unsafe_allow_html=True)
+    cat_cols = st.columns(3)
+    for col, (cat_name, cat_tweets) in zip(cat_cols, [
+        ("Research", research_tw),
+        ("Chains", chain_tw),
+        ("Institutional", inst_tw)
+    ]):
+        cat_color = {"Institutional":"#06b6d4","Research":"#8b5cf6","Chains":MANTLE_GREEN}.get(cat_name,"#6b7280")
+        cat_nar = Counter(get_narrative(t) for t in cat_tweets)
+        cat_sorted = sorted(cat_nar.items(), key=lambda x:-x[1])[:6]
+        cat_total = sum(v for _,v in cat_sorted) or 1
+        with col:
+            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{cat_color};margin-bottom:8px;text-transform:uppercase">{cat_name}</div>', unsafe_allow_html=True)
+            if cat_sorted:
+                fp = go.Figure(go.Pie(
+                    labels=[n for n,_ in cat_sorted],
+                    values=[c for _,c in cat_sorted],
+                    marker=dict(colors=[get_nar_color(n) for n,_ in cat_sorted],
+                                line=dict(color="#FFFFFF", width=2)),
+                    textfont_size=10, textfont_color="#0D3320", hole=0.5,
+                    hovertemplate="%{label}: %{value} posts (%{percent})<extra></extra>"))
+                pl = {k:v for k,v in BASE_LAYOUT.items() if k not in ("margin","legend")}
+                fp.update_layout(**pl, height=200, showlegend=False,
+                                 margin=dict(l=0,r=0,t=10,b=0))
+                st.plotly_chart(fp, use_container_width=True)
+                top = cat_sorted[0]
+                tc = get_nar_color(top[0])
+                st.markdown(f'<div style="text-align:center;font-size:11px;color:{tc};font-weight:700">#1 {top[0]} · {top[1]/cat_total*100:.0f}%</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div style="font-size:12px;color:#4A7A5A">No data</div>', unsafe_allow_html=True)
 
     # AI Analysis
     st.markdown('<div class="section-title">🤖 AI Market Intelligence Analysis</div>', unsafe_allow_html=True)
