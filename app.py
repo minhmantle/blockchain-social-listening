@@ -1049,6 +1049,51 @@ def tab_competitive(token):
 
     st.markdown("<div style='margin-top:16px'></div>", unsafe_allow_html=True)
 
+    # Views line chart — RIGHT AFTER KPI
+    fig = go.Figure()
+    for name, d in all_data.items():
+        df = group_by(d["tweets"], period)
+        if not df.empty:
+            fig.add_trace(go.Scatter(x=df["period"], y=df["impressions"], name=name,
+                                     mode="lines+markers",
+                                     line=dict(color=d["color"], width=2), marker=dict(size=5),
+                                     hovertemplate=f"{name}: " + "%{y:,}<extra></extra>"))
+    fig.update_layout(**BASE_LAYOUT, height=280, xaxis=AXIS, yaxis=AXIS,
+                      title=dict(text=f"Views by {period} — all chains",
+                                 font=dict(size=13, color="#E0F5EC"), x=0))
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Narrative Breakdown by Chain — RIGHT AFTER VIEWS CHART
+    st.markdown('<div class="section-title">Narrative Breakdown by Chain</div>', unsafe_allow_html=True)
+    nar_cols = st.columns(len(CHAIN_COLORS))
+    for col, (name, d) in zip(nar_cols, all_data.items()):
+        color = d["color"]
+        counts = Counter(get_narrative(t) for t in d["tweets"])
+        sorted_n = sorted(counts.items(), key=lambda x:-x[1])
+        total = sum(counts.values()) or 1
+        with col:
+            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{color};margin-bottom:10px;text-transform:uppercase">{name}</div>', unsafe_allow_html=True)
+            if sorted_n:
+                labels = [n for n,_ in sorted_n]
+                values = [c for _,c in sorted_n]
+                colors = [get_nar_color(n) for n in labels]
+                fp = go.Figure(go.Pie(
+                    labels=labels, values=values,
+                    marker=dict(colors=colors, line=dict(color=MANTLE_DARK, width=2)),
+                    textfont_size=10, hole=0.5,
+                    hovertemplate="%{label}: %{value} posts (%{percent})<extra></extra>"))
+                pl = {k:v for k,v in BASE_LAYOUT.items() if k not in ("margin","legend")}
+                fp.update_layout(**pl, height=220, showlegend=True,
+                                 margin=dict(l=0,r=0,t=10,b=0),
+                                 legend=dict(font=dict(size=10,color="#E0F5EC"),
+                                             bgcolor="rgba(0,0,0,0)"))
+                st.plotly_chart(fp, use_container_width=True)
+                top = sorted_n[0]
+                tc = get_nar_color(top[0])
+                st.markdown(f'<div style="text-align:center;font-size:11px;color:{tc};font-weight:700">#{1} {top[0]} · {top[1]/total*100:.0f}%</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>', unsafe_allow_html=True)
+
     # ── AI Content Summary ────────────────────────────────────────────────────
     st.markdown('<div class="section-title">🤖 AI Content Analysis</div>', unsafe_allow_html=True)
     if not anthropic_key:
@@ -1112,52 +1157,6 @@ def tab_competitive(token):
             )
         render_content_comparison(comparison)
     render_gap_analysis(all_data)
-
-    # Views line chart
-    fig = go.Figure()
-    for name, d in all_data.items():
-        df = group_by(d["tweets"], period)
-        if not df.empty:
-            fig.add_trace(go.Scatter(x=df["period"], y=df["impressions"], name=name,
-                                     mode="lines+markers",
-                                     line=dict(color=d["color"], width=2), marker=dict(size=5),
-                                     hovertemplate=f"{name}: " + "%{y:,}<extra></extra>"))
-    fig.update_layout(**BASE_LAYOUT, height=280, xaxis=AXIS, yaxis=AXIS,
-                      title=dict(text=f"Views by {period} — all chains",
-                                 font=dict(size=13, color="#E0F5EC"), x=0))
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ── Per-chain narrative breakdown ─────────────────────────────────────────
-    st.markdown('<div class="section-title">Narrative Breakdown by Chain</div>', unsafe_allow_html=True)
-    nar_cols = st.columns(len(CHAIN_COLORS))
-    for col, (name, d) in zip(nar_cols, all_data.items()):
-        color = d["color"]
-        counts = Counter(get_narrative(t) for t in d["tweets"])
-        sorted_n = sorted(counts.items(), key=lambda x:-x[1])
-        total = sum(counts.values()) or 1
-        with col:
-            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{color};margin-bottom:10px;text-transform:uppercase">{name}</div>', unsafe_allow_html=True)
-            if sorted_n:
-                labels = [n for n,_ in sorted_n]
-                values = [c for _,c in sorted_n]
-                colors = [get_nar_color(n) for n in labels]
-                fp = go.Figure(go.Pie(
-                    labels=labels, values=values,
-                    marker=dict(colors=colors, line=dict(color=MANTLE_DARK, width=2)),
-                    textfont_size=10, hole=0.5,
-                    hovertemplate="%{label}: %{value} posts (%{percent})<extra></extra>"))
-                pl = {k:v for k,v in BASE_LAYOUT.items() if k not in ("margin","legend")}
-                fp.update_layout(**pl, height=220, showlegend=True,
-                                 margin=dict(l=0,r=0,t=10,b=0),
-                                 legend=dict(font=dict(size=10,color="#E0F5EC"),
-                                             bgcolor="rgba(0,0,0,0)"))
-                st.plotly_chart(fp, use_container_width=True)
-                # top narrative label
-                top = sorted_n[0]
-                tc = get_nar_color(top[0])
-                st.markdown(f'<div style="text-align:center;font-size:11px;color:{tc};font-weight:700">#{1} {top[0]} · {top[1]/total*100:.0f}%</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>', unsafe_allow_html=True)
 
     # Top posts per chain
     st.markdown('<div class="section-title">Top Official Posts by Chain</div>', unsafe_allow_html=True)
