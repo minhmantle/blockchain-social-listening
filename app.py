@@ -658,17 +658,13 @@ def render_alerts(alerts, chain_name, color):
     if not alerts: return
     rows = []
     for alert_type, t, val in alerts[:5]:
-        text = t.get("text","")[:70] + "…"
+        raw_text = t.get("text","")[:70].replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;").replace("\n"," ") + "…"
         metric = f"{fmt(val)} views" if alert_type == "views" else f"{fmt(val)} eng"
         icon = "👁" if alert_type == "views" else "⚡"
         tid = t.get("id","")
         handle = {"Mantle":"Mantle_Official","Solana":"solana","Base":"base","Ondo":"OndoFinance"}.get(chain_name, chain_name)
         link = f"https://x.com/{handle}/status/{tid}"
-        rows.append(f"""<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid {color}22;overflow:hidden">
-          <span style="font-size:10px;font-weight:700;color:#f59e0b;white-space:nowrap">{icon} {metric}</span>
-          <span style="font-size:11px;color:{MANTLE_MUTED};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{text}</span>
-          <a href="{link}" target="_blank" style="color:{color};font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;text-decoration:none">↗ X</a>
-        </div>""")
+        rows.append(f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid {color}22;overflow:hidden"><span style="font-size:10px;font-weight:700;color:#f59e0b;white-space:nowrap">{icon} {metric}</span><span style="font-size:11px;color:{MANTLE_MUTED};flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{raw_text}</span><a href="{link}" target="_blank" style="color:{color};font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;text-decoration:none">↗ X</a></div>')
 
     rows_html = "".join(rows)
     st.markdown(f"""<style>
