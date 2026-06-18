@@ -1422,34 +1422,39 @@ def tab_competitive(token):
 
     # Narrative Breakdown by Chain — RIGHT AFTER VIEWS CHART
     st.markdown('<div class="section-title">Narrative Breakdown by Chain</div>', unsafe_allow_html=True)
-    nar_cols = st.columns(len(active_chains))
-    for col, (name, d) in zip(nar_cols, all_data.items()):
+    for name, d in all_data.items():
         color = d["color"]
         counts = Counter(get_narrative(t) for t in d["tweets"])
-        sorted_n = sorted(counts.items(), key=lambda x:-x[1])
+        sorted_n = sorted(counts.items(), key=lambda x:-x[1])[:8]
         total = sum(counts.values()) or 1
-        with col:
-            st.markdown(f'<div style="font-size:12px;font-weight:800;color:{color};margin-bottom:10px;text-transform:uppercase">{name}</div>', unsafe_allow_html=True)
-            if sorted_n:
-                labels = [n for n,_ in sorted_n]
-                values = [c for _,c in sorted_n]
-                colors = [get_nar_color(n) for n in labels]
-                fp = go.Figure(go.Pie(
-                    labels=labels, values=values,
-                    marker=dict(colors=colors, line=dict(color=MANTLE_DARK, width=2)),
-                    textfont_size=10, textfont_color="#0D3320", hole=0.5,
-                    hovertemplate="%{label}: %{value} posts (%{percent})<extra></extra>"))
-                pl = {k:v for k,v in BASE_LAYOUT.items() if k not in ("margin","legend")}
-                fp.update_layout(**pl, height=220, showlegend=True,
-                                 margin=dict(l=0,r=0,t=10,b=0),
-                                 legend=dict(font=dict(size=10,color="#0D3320"),
-                                             bgcolor="rgba(0,0,0,0)"))
-                st.plotly_chart(fp, use_container_width=True)
-                top = sorted_n[0]
-                tc = get_nar_color(top[0])
-                st.markdown(f'<div style="text-align:center;font-size:11px;color:{tc};font-weight:700">#{1} {top[0]} · {top[1]/total*100:.0f}%</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED}">No data</div>', unsafe_allow_html=True)
+        if not sorted_n:
+            continue
+        labels = [n for n,_ in sorted_n]
+        values = [c for _,c in sorted_n]
+        pcts = [c/total*100 for c in values]
+        bar_colors = [get_nar_color(n) for n in labels]
+
+        fig = go.Figure(go.Bar(
+            x=pcts, y=labels, orientation='h',
+            marker_color=bar_colors,
+            text=[f"{p:.0f}%  ({v} posts)" for p,v in zip(pcts,values)],
+            textposition="outside",
+            hovertemplate="%{y}: %{x:.1f}% (%{customdata} posts)<extra></extra>",
+            customdata=values,
+        ))
+        fig.update_layout(
+            **BASE_LAYOUT,
+            height=max(160, len(labels)*34),
+            showlegend=False,
+            margin=dict(l=10, r=120, t=32, b=10),
+            xaxis=dict(**AXIS, ticksuffix="%", range=[0, max(pcts)*1.35]),
+            yaxis=dict(color="#0D3320", tickfont=dict(color="#0D3320", size=12),
+                       showgrid=False, zeroline=False, autorange="reversed"),
+            title=dict(
+                text=f"<b>{name}</b>  ·  #1 {labels[0]} · {pcts[0]:.0f}%",
+                font=dict(size=13, color=color), x=0)
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
     # ── AI Content Comparison (single call, covers all chains) ──────────────
     st.markdown('<div class="section-title">🤖 AI Content Analysis & Comparison</div>', unsafe_allow_html=True)
