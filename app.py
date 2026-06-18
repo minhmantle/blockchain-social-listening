@@ -164,8 +164,8 @@ def ai_content_comparison(chains_data_tuple, anthropic_key):
 
 {chr(10).join(chain_summaries)}
 
-JSON only (max 15 words per field):
-{{"winner":"chain","winner_reason":"why","ranking":[{{"chain":"name","score":"Excellent/Good/Average/Weak","summary":"brief"}}],"market_momentum_leader":"chain — why","mantle_lessons":[{{"from_chain":"name","lesson":"what","example":"brief"}}]}}"""
+JSON only (max 15 words per field). IMPORTANT: mantle_lessons must include one entry for EVERY non-Mantle chain listed above:
+{{"winner":"chain","winner_reason":"why","ranking":[{{"chain":"name","score":"Excellent/Good/Average/Weak","summary":"brief"}}],"market_momentum_leader":"chain — why","mantle_lessons":[{{"from_chain":"name","lesson":"what to learn","example":"brief example"}}]}}"""
 
     import time, json, re as re2
     for attempt in range(3):
@@ -1485,10 +1485,12 @@ def tab_competitive(token):
     if not anthropic_key:
         st.warning("Add ANTHROPIC_API_KEY to enable AI analysis.")
     else:
-        for name, d in all_data.items():
+        import time as _time
+        for i_chain, (name, d) in enumerate(all_data.items()):
             color = d["color"]
             tweets = d["tweets"]
             if not tweets:
+                st.markdown(f'<div style="font-size:12px;color:{MANTLE_MUTED};margin-bottom:6px">{name}: no data available</div>', unsafe_allow_html=True)
                 continue
             total_v = sum(get_imp(t) for t in tweets)
             total_e = sum(eng(t.get("public_metrics",{})) for t in tweets)
@@ -1508,7 +1510,11 @@ def tab_competitive(token):
                 "top_narrative": top_nar_name,
             }.items())
 
-            with st.spinner(f"Analyzing {name}…"):
+            # Add delay between chains to avoid rate limit
+            if i_chain > 0:
+                _time.sleep(3)
+
+            with st.spinner(f"Analyzing {name} content…"):
                 swot = ai_chain_swot(
                     name,
                     tuple({"text": t.get("text",""), "narrative": t.get("narrative",""),
