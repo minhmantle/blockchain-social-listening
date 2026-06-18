@@ -22,18 +22,34 @@ MANTLE_TEXT    = "#0D3320"
 MANTLE_MUTED   = "#4A7A5A"
 
 CHAIN_COLORS = {
-    "Mantle":  MANTLE_GREEN,
-    "Solana":  "#9945FF",
-    "Base":    "#2563EB",
-    "Ondo":    "#FF6B35",
+    "Mantle":   MANTLE_GREEN,
+    "Solana":   "#9945FF",
+    "Base":     "#2563EB",
+    "Ondo":     "#FF6B35",
+    "Plume":    "#E84142",
+    "Arbitrum": "#12AAFF",
+    "Optimism": "#FF0420",
+    "Plasma":   "#7B2FBE",
+    "BNBChain": "#F0B90B",
+    "Stellar":  "#7D00FF",
+    "Avax":     "#E84142",
 }
 
 CHAIN_HANDLES = {
-    "Mantle": "Mantle_Official",
-    "Solana": "solana",
-    "Base":   "base",
-    "Ondo":   "OndoFinance",
+    "Mantle":   "Mantle_Official",
+    "Solana":   "solana",
+    "Base":     "base",
+    "Ondo":     "OndoFinance",
+    "Plume":    "plumenetwork",
+    "Arbitrum": "arbitrum",
+    "Optimism": "Optimism",
+    "Plasma":   "Plasma",
+    "BNBChain": "BNBCHAIN",
+    "Stellar":  "StellarOrg",
+    "Avax":     "avax",
 }
+
+DEFAULT_CHAINS = ["Mantle", "Solana", "Base", "Ondo"]
 
 NARRATIVES = {
     "RWA":           ["rwa","real world asset","real-world asset","tokenized asset","tokenized bond",
@@ -1194,11 +1210,33 @@ def tab_mantle(token):
 # ── TAB 2 ────────────────────────────────────────────────────────────────────
 def tab_competitive(token):
     tab_description(
-        "Competitive Analysis — Mantle vs Solana vs Base vs Ondo",
-        "Compares official post performance across 4 chains side by side. Includes AI content summary, gap analysis, narrative breakdown per chain, and top KOL mentions.",
-        ["Mantle_Official","solana","base","OndoFinance"],
+        "Competitive Analysis — Multi-Chain",
+        "Compares official post performance across selected chains side by side. Includes AI content summary, gap analysis, narrative breakdown per chain, and top KOL mentions.",
+        ["Select chains below"],
         "Official posts: custom date range · KOL mentions: last 7 days"
     )
+
+    # Chain selector
+    all_chain_names = list(CHAIN_COLORS.keys())
+    selected_chains = st.multiselect(
+        "Select chains to compare (Mantle is always included):",
+        options=[c for c in all_chain_names if c != "Mantle"],
+        default=[c for c in DEFAULT_CHAINS if c != "Mantle"],
+        key="chain_selector"
+    )
+    # Always include Mantle
+    if "Mantle" not in selected_chains:
+        selected_chains = ["Mantle"] + selected_chains
+    else:
+        selected_chains = ["Mantle"] + [c for c in selected_chains if c != "Mantle"]
+
+    if len(selected_chains) < 2:
+        st.warning("Please select at least one other chain to compare.")
+        return
+
+    # Build active chain config
+    active_chains = {name: CHAIN_COLORS[name] for name in selected_chains}
+
     start, end, period = date_controls("t2")
     start_iso, end_iso = iso_range(start, end)
     days = (end - start).days + 1
@@ -1208,7 +1246,7 @@ def tab_competitive(token):
 
     all_data = {}
     with st.spinner("Fetching all chains…"):
-        for name, color in CHAIN_COLORS.items():
+        for name, color in active_chains.items():
             handle = CHAIN_HANDLES[name]
             u = get_user(handle, token)
             uid = u.get("id", "")
@@ -1230,7 +1268,7 @@ def tab_competitive(token):
 
     # KPI snapshot
     st.markdown('<div class="section-title">Performance Snapshot</div>', unsafe_allow_html=True)
-    cols = st.columns(len(CHAIN_COLORS))
+    cols = st.columns(len(active_chains))
     for col, (name, d) in zip(cols, all_data.items()):
         color = d["color"]
         followers = d["user"].get("public_metrics",{}).get("followers_count",0) or 0
@@ -1268,7 +1306,7 @@ def tab_competitive(token):
 
     # Narrative Breakdown by Chain — RIGHT AFTER VIEWS CHART
     st.markdown('<div class="section-title">Narrative Breakdown by Chain</div>', unsafe_allow_html=True)
-    nar_cols = st.columns(len(CHAIN_COLORS))
+    nar_cols = st.columns(len(active_chains))
     for col, (name, d) in zip(nar_cols, all_data.items()):
         color = d["color"]
         counts = Counter(get_narrative(t) for t in d["tweets"])
@@ -1347,16 +1385,19 @@ def tab_competitive(token):
 
     # KOL mentions
     st.markdown('<div class="section-title">Top KOL Mentions by Views (last 7 days)</div>', unsafe_allow_html=True)
-    mcols = st.columns(len(CHAIN_COLORS))
+    mcols = st.columns(len(active_chains))
     for col, (name, d) in zip(mcols, all_data.items()):
+        handle = d["handle"]
         if name == "Base":
             q = '"Base chain" OR "Base blockchain" OR "build on Base" (crypto OR blockchain OR web3) -from:base -is:retweet lang:en min_faves:50'
         elif name == "Solana":
             q = '(#Solana OR "Solana network" OR "SOL blockchain") (crypto OR blockchain OR defi OR web3) -from:solana -is:retweet lang:en min_faves:50'
         elif name == "Ondo":
             q = '(#Ondo OR "Ondo Finance" OR USDY OR OUSG) (crypto OR blockchain OR rwa OR defi) -from:OndoFinance -is:retweet lang:en min_faves:20'
-        else:
+        elif name == "Mantle":
             q = '(#Mantle OR "Mantle network" OR "Mantle blockchain" OR mETH) (crypto OR blockchain OR defi OR web3) -from:Mantle_Official -is:retweet lang:en min_faves:20'
+        else:
+            q = f'(#{name} OR "{name} network" OR "{name} blockchain") (crypto OR blockchain OR defi OR web3) -from:{handle} -is:retweet lang:en min_faves:20'
         with st.spinner(f"Fetching {name} mentions…"):
             mentions = search_tweets(q, token, si7, ei7, max_results=100)
         mentions = [t for t in mentions if any(k in t.get("text","").lower() for k in BLOCKCHAIN_KW)]
