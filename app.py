@@ -820,7 +820,7 @@ section[data-testid="stSidebar"]{{display:none;}}
 .stTabs [data-baseweb="tab-list"]{{gap:4px;background:#E8F5EE;border-bottom:2px solid #C8EAD8;padding:0 4px;}}
 .stTabs [data-baseweb="tab"]{{background:transparent;border-radius:6px 6px 0 0;color:#4A7A5A;font-size:13px;font-weight:600;padding:10px 22px;border:none;letter-spacing:0.02em;}}
 .stTabs [aria-selected="true"]{{background:#FFFFFF !important;color:#00A572 !important;border-bottom:2px solid #00A572 !important;}}
-.kpi-card{{background:#FFFFFF;border:1px solid #C8EAD8;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,165,114,0.08);}}
+.kpi-card{{background:#FFFFFF;border:1px solid #C8EAD8;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,165,114,0.08);}} .kpi-card *{{user-select:none;}}
 .kpi-label{{font-size:11px;color:{MANTLE_MUTED};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;font-weight:600;}}
 .kpi-value{{font-size:26px;font-weight:800;color:#0D3320;letter-spacing:-0.5px;}}
 .kpi-delta-up{{font-size:12px;color:{MANTLE_GREEN};margin-top:5px;font-weight:500;}}
@@ -1043,12 +1043,12 @@ def tab_competitive(token):
         col.markdown(f"""
         <div class="kpi-card">
           <div style="font-size:12px;font-weight:800;color:{color};text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">{name}</div>
-          <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:2px">Followers</div>
-          <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:10px">{fmt(followers)}</div>
-          <div style="font-size:11px;color:{MANTLE_MUTED};margin-bottom:2px">Total views</div>
+          <div style="font-size:11px;color:#4A7A5A;font-weight:500;margin-bottom:2px">Followers</div>
+          <div style="font-size:20px;font-weight:800;color:#0D3320;margin-bottom:10px">{fmt(followers)}</div>
+          <div style="font-size:11px;color:#4A7A5A;font-weight:500;margin-bottom:2px">Total views</div>
           <div style="font-size:20px;font-weight:800;color:{color}">{fmt(total_v)}</div>
           <div style="font-size:12px;{dcls};margin-top:4px;font-weight:600">{arrow} {abs(delta):.1f}% vs prev</div>
-          <div style="font-size:11px;color:{MANTLE_MUTED};margin-top:8px">{len(d['tweets'])} posts</div>
+          <div style="font-size:11px;color:#4A7A5A;font-weight:500;margin-top:8px">{len(d['tweets'])} posts</div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:16px'></div>", unsafe_allow_html=True)
@@ -1084,12 +1084,12 @@ def tab_competitive(token):
                 fp = go.Figure(go.Pie(
                     labels=labels, values=values,
                     marker=dict(colors=colors, line=dict(color=MANTLE_DARK, width=2)),
-                    textfont_size=10, hole=0.5,
+                    textfont_size=10, textfont_color="#0D3320", hole=0.5,
                     hovertemplate="%{label}: %{value} posts (%{percent})<extra></extra>"))
                 pl = {k:v for k,v in BASE_LAYOUT.items() if k not in ("margin","legend")}
                 fp.update_layout(**pl, height=220, showlegend=True,
                                  margin=dict(l=0,r=0,t=10,b=0),
-                                 legend=dict(font=dict(size=10,color="#E0F5EC"),
+                                 legend=dict(font=dict(size=10,color="#0D3320"),
                                              bgcolor="rgba(0,0,0,0)"))
                 st.plotly_chart(fp, use_container_width=True)
                 top = sorted_n[0]
