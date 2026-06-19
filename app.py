@@ -6,34 +6,6 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta, date
 from collections import Counter
 import re
-import time
-import json as _json
-
-def call_anthropic(prompt, anthropic_key, max_tokens=1000):
-    """Centralized Anthropic API call với exponential backoff"""
-    for attempt in range(4):
-        try:
-            r = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": max_tokens,
-                      "messages": [{"role": "user", "content": prompt}]},
-                timeout=45
-            )
-            if r.status_code == 200:
-                raw = r.json()["content"][0]["text"].strip()
-                raw = re.sub(r'^```(?:json)?\s*', '', raw)
-                raw = re.sub(r'\s*```$', '', raw).strip()
-                return _json.loads(raw)
-            if r.status_code == 429:
-                wait = (2 ** attempt) * 10  # 10s, 20s, 40s, 80s
-                time.sleep(wait)
-                continue
-            return None
-        except Exception:
-            if attempt < 3:
-                time.sleep((2 ** attempt) * 5)
-    return None
 
 st.set_page_config(
     page_title="Mantle Social Intelligence",
@@ -147,7 +119,7 @@ def get_anthropic_key():
     try: return st.secrets["ANTHROPIC_API_KEY"]
     except: return None
 
-@st.cache_data(ttl=21600)
+@st.cache_data(ttl=1800)
 def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
     if not anthropic_key or not tweets_text_list: return None
     sample = list(tweets_text_list)[:20]
@@ -157,9 +129,22 @@ def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
 
 TWEETS:
 {combined}"""
-    return call_anthropic(prompt, anthropic_key, max_tokens=600)
+    try:
+        r = requests.post("https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600,
+                  "messages": [{"role": "user", "content": prompt}]}, timeout=30)
+        if r.status_code == 200:
+            import json, re as re2
+            raw = r.json()["content"][0]["text"].strip()
+            raw = re2.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re2.sub(r'\s*```$', '', raw).strip()
+            return json.loads(raw)
+        return {"_error": f"HTTP {r.status_code}"}
+    except Exception as e:
+        return {"_error": str(e)}
 
-@st.cache_data(ttl=21600)
+@st.cache_data(ttl=1800)
 def ai_content_comparison(chains_data_tuple, anthropic_key):
     """Compare content quality across chains and give Mantle actionable lessons"""
     if not anthropic_key: return None
@@ -175,23 +160,38 @@ def ai_content_comparison(chains_data_tuple, anthropic_key):
         total_views = data.get("total_views", 0)
         chain_summaries.append(f"=={name}== ({fmt(followers)} followers, {fmt(total_views)} views)\n{samples}")
 
-    prompt = f"""You are a crypto social media strategist writing a competitive landscape report for Mantle's internal team. Your goal is to highlight Mantle's strengths and position any gaps as strategic opportunities rather than weaknesses.
+    prompt = f"""Senior crypto social media strategist. Compare these chains briefly:
 
 {chr(10).join(chain_summaries)}
 
-Framing rules:
-- In the ranking, never give Mantle a score below "Average" — frame it as "building momentum"
-- winner_reason: if Mantle is not the winner, acknowledge the winner briefly then pivot to what Mantle does well
-- For Mantle's ranking summary: focus on its diversified narrative approach and growth potential
-- mantle_lessons: frame as "inspiration to accelerate" not "catching up"
-- market_momentum_leader: can acknowledge another chain but add that Mantle is well-positioned to capitalize
-
 JSON only (max 15 words per field). IMPORTANT: mantle_lessons must include one entry for EVERY non-Mantle chain listed above:
-{{"winner":"chain","winner_reason":"why","ranking":[{{"chain":"name","score":"Excellent/Good/Average","summary":"brief"}}],"market_momentum_leader":"chain — why","mantle_lessons":[{{"from_chain":"name","lesson":"what to learn","example":"brief example"}}]}}"""
+{{"winner":"chain","winner_reason":"why","ranking":[{{"chain":"name","score":"Excellent/Good/Average/Weak","summary":"brief"}}],"market_momentum_leader":"chain — why","mantle_lessons":[{{"from_chain":"name","lesson":"what to learn","example":"brief example"}}]}}"""
 
-    return call_anthropic(prompt, anthropic_key, max_tokens=1200)
+    import time, json, re as re2
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=40
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re2.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re2.sub(r'\s*```$', '', raw)
+                return json.loads(raw.strip())
+            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
+        except Exception as e:
+            if attempt == 2: return {"_error": str(e)}
+            time.sleep(10)
+    return {"_error": "Rate limit — wait 1 min and refresh"}
 
-@st.cache_data(ttl=21600)
+@st.cache_data(ttl=1800)
 def ai_chains_swot_batch(chains_data_tuple, anthropic_key):
     """Batch SWOT for all chains in one API call"""
     if not anthropic_key: return {}
@@ -204,29 +204,94 @@ def ai_chains_swot_batch(chains_data_tuple, anthropic_key):
         samples = " | ".join([f"[{t.get('narrative','?')}] {t.get('text','')[:80]}" for t in top])
         summaries.append(f"=={name}== {fmt(m.get('followers',0))} followers, {fmt(m.get('total_views',0))} views, eng:{m.get('eng_rate',0):.1f}%, top_nar:{m.get('top_narrative','?')}\nPosts: {samples}")
 
-    prompt = f"""You are a crypto social media strategist writing an internal report. For each chain, provide a constructive, growth-oriented analysis. For Mantle specifically, be especially encouraging — frame all gaps as opportunities and lead with strengths.
+    prompt = f"""Crypto social media strategist. Analyze content for each chain below.
 
 {chr(10).join(summaries)}
-
-Tone rules:
-- strengths: state confidently, be specific
-- weaknesses: reframe as "growth opportunities" or "areas to double down on" — never harsh criticism
-- improvements: actionable, optimistic next steps
-- For Mantle: extra positive framing — it is an emerging L2 with strong fundamentals building momentum
 
 Return JSON with one entry per chain (max 15 words per item):
 {{"chains":[{{"name":"chain","content_style":"1 sentence","strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"improvements":["i1","i2","i3"]}}]}}
 JSON only."""
 
-    result = call_anthropic(prompt, anthropic_key, max_tokens=2000)
-    if result and "chains" in result:
-        return {item["name"]: item for item in result.get("chains", [])}
+    import time, json, re as re5
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2000,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=45
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re5.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re5.sub(r'\s*```$', '', raw)
+                data = json.loads(raw.strip())
+                # Return as dict keyed by chain name
+                return {item["name"]: item for item in data.get("chains", [])}
+            return {}
+        except Exception as e:
+            if attempt == 2: return {}
+            time.sleep(10)
     return {}
+    """Compare content quality across chains and give Mantle actionable lessons"""
+    if not anthropic_key: return None
+    chains_data = dict(chains_data_tuple)
+
+    chain_summaries = []
+    for name, data in chains_data.items():
+        tweets = data.get("tweets", [])[:15]
+        top = sorted(tweets, key=lambda t: (t.get("public_metrics",{}).get("impression_count") or 0) or
+                     ((t.get("public_metrics",{}).get("like_count",0) or 0)*100), reverse=True)[:5]
+        samples = "\n".join([f"- [{t.get('narrative','?')}] {t.get('text','')[:120]} (views:{fmt(t.get('public_metrics',{}).get('impression_count') or 0)})" for t in top])
+        followers = data.get("followers", 0)
+        total_views = data.get("total_views", 0)
+        chain_summaries.append(f"=={name}== ({followers:,} followers, {total_views:,} total views)\nTop posts:\n{samples}")
+
+    prompt = f"""You are a senior crypto social media strategist. Compare content performance across these chains:
+
+{chr(10).join(chain_summaries)}
+
+Provide analysis in this exact JSON (keep each string under 120 words):
+{{"winner":"chain name with best content quality","winner_reason":"why they win — specific content strategies, narrative alignment, format choices",
+"ranking":[{{"chain":"name","score":"Excellent/Good/Average/Weak","summary":"2-3 sentences on their content approach and what works"}}],
+"market_momentum_leader":"which chain best captures current market narratives and why",
+"mantle_lessons":[{{"from_chain":"chain name","lesson":"specific actionable thing Mantle should copy or adapt","example":"concrete example from their posts"}}]}}
+
+Be specific, reference actual post content. JSON only."""
+
+    import time, json, re as re2
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=40
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re2.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re2.sub(r'\s*```$', '', raw)
+                return json.loads(raw.strip())
+            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
+        except Exception as e:
+            if attempt == 2:
+                return {"_error": str(e)}
+            time.sleep(10)
+    return {"_error": "Rate limit — please wait 1 min and refresh"}
 
 def render_chain_swot(name, swot, color):
     if not swot: return
     if "_error" in swot:
-        st.info("⏳ AI analysis temporarily unavailable")
+        st.error(f"AI Error: {swot['_error']}")
         return
     style = swot.get("content_style","")
     st.markdown(f"""
@@ -252,7 +317,7 @@ def render_chain_swot(name, swot, color):
 def render_content_comparison(analysis):
     if not analysis: return
     if "_error" in analysis:
-        st.info("⏳ AI analysis temporarily unavailable")
+        st.error(f"AI Error: {analysis['_error']}")
         return
 
     winner = analysis.get("winner","—")
@@ -301,7 +366,7 @@ def render_content_comparison(analysis):
               <div style="font-size:11px;color:{MANTLE_MUTED};line-height:1.5">💡 {lesson.get("example","")}</div>
             </div>""", unsafe_allow_html=True)
 
-@st.cache_data(ttl=21600)
+@st.cache_data(ttl=1800)
 def ai_social_expert_analysis(tweets_tuple, metrics_data, anthropic_key):
     """Claude as social media expert analyzing Mantle's content performance"""
     if not anthropic_key or not tweets_tuple:
@@ -327,7 +392,7 @@ def ai_social_expert_analysis(tweets_tuple, metrics_data, anthropic_key):
     # Only send top 10 posts to keep prompt short
     samples_str = "\n".join([f"- [{s['narrative']}] {s['text'][:120]} (views:{s['views']:,} likes:{s['likes']})" for s in samples[:10]])
 
-    prompt = f"""You are a supportive crypto social media strategist writing an internal performance report for Mantle's own team. Your tone is encouraging and growth-oriented — highlight what is working well, frame gaps as exciting opportunities, and keep the overall assessment positive and motivating.
+    prompt = f"""You are a senior crypto social media strategist. Analyze @Mantle_Official's Twitter performance.
 
 METRICS:
 - Posts: {metrics_data['post_count']} | Views: {metrics_data['total_views']:,} | Likes: {metrics_data['total_likes']:,} | Eng.rate: {metrics_data['eng_rate']:.2f}% | Followers: {metrics_data['followers']:,}
@@ -337,27 +402,40 @@ METRICS:
 TOP POSTS:
 {samples_str}
 
-Tone rules:
-- overall_score: lean toward "Good" unless metrics are truly catastrophic
-- overall_assessment: start with what's working, then pivot to growth opportunities
-- engagement_analysis: find positives first, frame low numbers as "early stage growth trajectory"
-- content_quality: highlight strong posts, frame gaps as "opportunities to double down"
-- narrative_fit: position Mantle's narrative mix as "strategic diversification" not scattered
-- strengths: genuine strengths, stated confidently
-- weaknesses: reframe as "areas with the most upside potential" — never harsh
-- recommendations: actionable, optimistic next steps
-
 Return ONLY this JSON (no markdown, keep each string under 100 words):
 {{"overall_score":"Good or Average or Needs Improvement","overall_assessment":"assessment here","engagement_analysis":"analysis here","content_quality":"quality here","narrative_fit":"fit here","strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"recommendations":["r1","r2","r3"]}}"""
 
-    return call_anthropic(prompt, anthropic_key, max_tokens=1500)
+    import time, json, re as re3
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=30
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re3.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re3.sub(r'\s*```$', '', raw)
+                return json.loads(raw.strip())
+            return {"_error": f"HTTP {r.status_code}: {r.text[:300]}"}
+        except Exception as e:
+            if attempt == 2:
+                return {"_error": str(e)}
+            time.sleep(10)
+    return {"_error": "Rate limit — please wait 1 min and refresh"}
 
 def render_social_expert_analysis(analysis):
     if not analysis:
         st.info("AI analysis unavailable. Check Anthropic API key.")
         return
     if "_error" in analysis:
-        st.info("⏳ AI analysis temporarily unavailable")
+        st.error(f"API Error: {analysis['_error']}")
         return
 
     score = analysis.get("overall_score", "—")
@@ -472,7 +550,7 @@ def detect_nar_keyword(text):
     found = [n for n, kws in NARRATIVES.items() if any(k in tl for k in kws)]
     return found[0] if found else "Other"
 
-@st.cache_data(ttl=21600)
+@st.cache_data(ttl=1800)
 def classify_narratives_batch(texts_tuple, anthropic_key):
     """Use Claude to classify tweets into narratives — free-form labels"""
     if not anthropic_key:
@@ -495,9 +573,28 @@ Respond with ONLY a JSON object. Example:
 {{"1":"RWA","2":"DeFi","3":"Meme","4":"Community","5":"Infrastructure"}}
 No explanation, no markdown, just JSON."""
 
-    result = call_anthropic(prompt, anthropic_key, max_tokens=800)
-    if result:
-        return {int(k)-1: v for k,v in result.items()}
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": anthropic_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 800,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=30
+        )
+        if r.status_code == 200:
+            import json
+            raw = r.json()["content"][0]["text"].strip()
+            result = json.loads(raw)
+            return {int(k)-1: v for k,v in result.items()}
+    except:
+        pass
     return {}
 
 def classify_tweets_narratives(tweets, anthropic_key):
@@ -611,7 +708,7 @@ def kpi(col, label, value, delta=None, sub=None, color=MANTLE_GREEN):
 def render_post(t, rank, color, chain_name=None, is_user=False):
     m = t.get("public_metrics", {})
     text = t.get("text", "")
-    brief = (text[:120] + ("…" if len(text) > 120 else "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    brief = text[:120] + ("…" if len(text) > 120 else "")
     imp = get_imp(t)
     tid = t.get("id", "")
     if is_user:
@@ -623,28 +720,27 @@ def render_post(t, rank, color, chain_name=None, is_user=False):
     link = f"https://x.com/{handle}/status/{tid}" if tid else "#"
     ago = time_ago(t.get("created_at", ""))
     narrs = detect_nar(text)
-    pill_style = "display:inline-block;font-size:9px;padding:1px 6px;border-radius:99px;margin-right:3px;font-weight:600"
-    badge = f'<span style="{pill_style};background:{color}22;color:{color};border:1px solid {color}44">{chain_name}</span>' if chain_name else ""
-    pills = " ".join([f'<span style="{pill_style};background:{get_nar_color(n)}22;color:{get_nar_color(n)};border:1px solid {get_nar_color(n)}33">{n}</span>' for n in narrs])
+    badge = f'<span class="narrative-pill" style="background:{color}22;color:{color};border:1px solid {color}44;font-size:9px;padding:1px 6px;border-radius:99px">{chain_name}</span>' if chain_name else ""
+    pills = " ".join([f'<span class="narrative-pill" style="background:{get_nar_color(n)}22;color:{get_nar_color(n)};border:1px solid {get_nar_color(n)}33;font-size:9px;padding:1px 6px">{n}</span>' for n in narrs])
     fstr = f" · {fmt(followers)} flw" if followers else ""
     st.markdown(f"""
-    <div style="background:#FFFFFF;border:1px solid #C8EAD8;border-radius:10px;padding:10px 12px;margin-bottom:6px;font-family:Inter,sans-serif;box-shadow:0 1px 3px rgba(0,165,114,0.06)">
+    <div class="post-card" style="padding:10px 12px;margin-bottom:6px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px">
-        <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
           <span style="font-size:13px;font-weight:800;color:#aaa;min-width:20px">#{rank}</span>
           {badge}
-          <span style="font-size:12px;font-weight:700;color:#0D3320;white-space:nowrap">@{handle}</span>
-          <span style="font-size:10px;color:#4A7A5A;white-space:nowrap">{ago}{fstr}</span>
+          <span style="font-size:12px;font-weight:700;color:{MANTLE_TEXT};white-space:nowrap">@{handle}</span>
+          <span style="font-size:10px;color:{MANTLE_MUTED};white-space:nowrap">{ago}{fstr}</span>
           {pills}
         </div>
         <div style="text-align:right;flex-shrink:0">
           <span style="font-size:13px;font-weight:800;color:{color}">{fmt(imp)}</span>
-          <span style="font-size:9px;color:#4A7A5A"> views</span>
+          <span style="font-size:9px;color:{MANTLE_MUTED}"> views</span>
         </div>
       </div>
       <div style="font-size:11px;color:#4A7A5A;line-height:1.45;margin-bottom:6px">{brief}</div>
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:10px;color:#4A7A5A">
+        <div style="font-size:10px;color:{MANTLE_MUTED}">
           ♥ {fmt(m.get("like_count",0))} &nbsp;·&nbsp;
           ↺ {fmt(m.get("retweet_count",0))} &nbsp;·&nbsp;
           💬 {fmt(m.get("reply_count",0))}
@@ -1206,8 +1302,9 @@ def tab_mantle(token):
                     anthropic_key
                 )
                 if not analysis:
-                    analysis = None
+                    st.error(f"API returned None. Key starts with: {anthropic_key[:10] if anthropic_key else 'MISSING'}")
             except Exception as ex:
+                st.error(f"Error: {ex}")
                 analysis = None
         render_social_expert_analysis(analysis)
 
@@ -1658,7 +1755,7 @@ def impact_score(t):
 
     return reach_score + eng_score + kw_score + cred_score
 
-@st.cache_data(ttl=21600)
+@st.cache_data(ttl=1800)
 def ai_market_intelligence(tweets_tuple, anthropic_key):
     """Claude analyzes market-wide intelligence"""
     if not anthropic_key or not tweets_tuple: return None
@@ -1695,7 +1792,29 @@ Respond ONLY with this JSON (keep each string concise, under 80 words):
 
 JSON only, no markdown."""
 
-    return call_anthropic(prompt, anthropic_key, max_tokens=2000)
+    import time, json, re as re4
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2000,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=45
+            )
+            if r.status_code == 429:
+                time.sleep(15)
+                continue
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re4.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re4.sub(r'\s*```$', '', raw)
+                return json.loads(raw.strip())
+            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
+        except Exception as e:
+            if attempt == 2: return {"_error": str(e)}
+            time.sleep(10)
+    return {"_error": "Rate limit — wait 1 min and refresh"}
 
 def find_best_match_tweet(text_signal, all_tweets, category_filter=None):
     """Find the tweet that best matches an AI-generated signal text"""
@@ -1725,7 +1844,7 @@ def tweet_link(t):
 def render_intel_analysis(analysis, all_tweets):
     if not analysis: return
     if "_error" in analysis:
-        st.info("⏳ AI analysis temporarily unavailable")
+        st.error(f"AI Error: {analysis['_error']}")
         return
 
     # Market Summary
@@ -1809,7 +1928,15 @@ def render_intel_analysis(analysis, all_tweets):
           </div>
         </div>""", unsafe_allow_html=True)
 
-
+    # Top posts by impact score
+    st.markdown('<div class="section-title">🏆 Top Posts by Impact Score</div>', unsafe_allow_html=True)
+    top_posts = sorted(all_tweets, key=impact_score, reverse=True)[:9]
+    cols = st.columns(3)
+    for i, (col, t) in enumerate(zip(cols * 3, top_posts), 1):
+        cat = t.get("author_category","")
+        cat_color = {"Institutional":"#06b6d4","Research & Media":"#8b5cf6","Chains":MANTLE_GREEN}.get(cat,"#6b7280")
+        with col:
+            render_post(t, i, cat_color, is_user=True)
 
 def tab_intel(token):
     tab_description(
@@ -1905,12 +2032,10 @@ def tab_intel(token):
         cat_total = sum(v for _,v in cat_sorted) or 1
         with col:
             st.markdown(f'<div style="font-size:12px;font-weight:800;color:{cat_color};margin-bottom:4px;text-transform:uppercase">{cat_name}</div>', unsafe_allow_html=True)
-            # Show account list — truncate to max 1 line
+            # Show account list
             accs = INTEL_ACCOUNTS.get(cat_name, [])
-            accs_str = " · ".join([f"@{a}" for a in accs[:5]])
-            if len(accs) > 5:
-                accs_str += f" · +{len(accs)-5} more"
-            st.markdown(f'<div style="font-size:10px;color:#4A7A5A;margin-bottom:8px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{accs_str}</div>', unsafe_allow_html=True)
+            accs_str = " · ".join([f"@{a}" for a in accs])
+            st.markdown(f'<div style="font-size:10px;color:#4A7A5A;margin-bottom:8px;line-height:1.5">{accs_str}</div>', unsafe_allow_html=True)
             if cat_sorted:
                 fp = go.Figure(go.Pie(
                     labels=[n for n,_ in cat_sorted],
@@ -1920,12 +2045,12 @@ def tab_intel(token):
                     textfont_size=10, textfont_color="#0D3320", hole=0.5,
                     hovertemplate="%{label}: %{value} posts (%{percent})<extra></extra>"))
                 pl = {k:v for k,v in BASE_LAYOUT.items() if k not in ("margin","legend")}
-                fp.update_layout(**pl, height=220, showlegend=False,
-                                 margin=dict(l=10,r=10,t=10,b=10))
+                fp.update_layout(**pl, height=200, showlegend=False,
+                                 margin=dict(l=0,r=0,t=10,b=0))
                 st.plotly_chart(fp, use_container_width=True)
                 top = cat_sorted[0]
                 tc = get_nar_color(top[0])
-                st.markdown(f'<div style="text-align:center;font-size:11px;color:{tc};font-weight:700;margin-top:-8px">#1 {top[0]} · {top[1]/cat_total*100:.0f}%</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="text-align:center;font-size:11px;color:{tc};font-weight:700">#1 {top[0]} · {top[1]/cat_total*100:.0f}%</div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div style="font-size:12px;color:#4A7A5A">No data</div>', unsafe_allow_html=True)
 
