@@ -6,6 +6,34 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta, date
 from collections import Counter
 import re
+import time
+import json as _json
+
+def call_anthropic(prompt, anthropic_key, max_tokens=1000):
+    """Centralized Anthropic API call với exponential backoff"""
+    for attempt in range(4):
+        try:
+            r = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": max_tokens,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=45
+            )
+            if r.status_code == 200:
+                raw = r.json()["content"][0]["text"].strip()
+                raw = re.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re.sub(r'\s*```$', '', raw).strip()
+                return _json.loads(raw)
+            if r.status_code == 429:
+                wait = (2 ** attempt) * 10  # 10s, 20s, 40s, 80s
+                time.sleep(wait)
+                continue
+            return None
+        except Exception:
+            if attempt < 3:
+                time.sleep((2 ** attempt) * 5)
+    return None
 
 st.set_page_config(
     page_title="Mantle Social Intelligence",
@@ -119,7 +147,7 @@ def get_anthropic_key():
     try: return st.secrets["ANTHROPIC_API_KEY"]
     except: return None
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)
 def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
     if not anthropic_key or not tweets_text_list: return None
     sample = list(tweets_text_list)[:20]
@@ -129,22 +157,9 @@ def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
 
 TWEETS:
 {combined}"""
-    try:
-        r = requests.post("https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600,
-                  "messages": [{"role": "user", "content": prompt}]}, timeout=30)
-        if r.status_code == 200:
-            import json, re as re2
-            raw = r.json()["content"][0]["text"].strip()
-            raw = re2.sub(r'^```(?:json)?\s*', '', raw)
-            raw = re2.sub(r'\s*```$', '', raw).strip()
-            return json.loads(raw)
-        return {"_error": f"HTTP {r.status_code}"}
-    except Exception as e:
-        return {"_error": str(e)}
+    return call_anthropic(prompt, anthropic_key, max_tokens=600)
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)
 def ai_content_comparison(chains_data_tuple, anthropic_key):
     """Compare content quality across chains and give Mantle actionable lessons"""
     if not anthropic_key: return None
@@ -174,31 +189,9 @@ Framing rules:
 JSON only (max 15 words per field). IMPORTANT: mantle_lessons must include one entry for EVERY non-Mantle chain listed above:
 {{"winner":"chain","winner_reason":"why","ranking":[{{"chain":"name","score":"Excellent/Good/Average","summary":"brief"}}],"market_momentum_leader":"chain — why","mantle_lessons":[{{"from_chain":"name","lesson":"what to learn","example":"brief example"}}]}}"""
 
-    import time, json, re as re2
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200,
-                      "messages": [{"role": "user", "content": prompt}]},
-                timeout=40
-            )
-            if r.status_code == 429:
-                time.sleep(15)
-                continue
-            if r.status_code == 200:
-                raw = r.json()["content"][0]["text"].strip()
-                raw = re2.sub(r'^```(?:json)?\s*', '', raw)
-                raw = re2.sub(r'\s*```$', '', raw)
-                return json.loads(raw.strip())
-            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
-        except Exception as e:
-            if attempt == 2: return {"_error": str(e)}
-            time.sleep(10)
-    return {"_error": "Rate limit — wait 1 min and refresh"}
+    return call_anthropic(prompt, anthropic_key, max_tokens=1200)
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)
 def ai_chains_swot_batch(chains_data_tuple, anthropic_key):
     """Batch SWOT for all chains in one API call"""
     if not anthropic_key: return {}
@@ -225,86 +218,15 @@ Return JSON with one entry per chain (max 15 words per item):
 {{"chains":[{{"name":"chain","content_style":"1 sentence","strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"improvements":["i1","i2","i3"]}}]}}
 JSON only."""
 
-    import time, json, re as re5
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2000,
-                      "messages": [{"role": "user", "content": prompt}]},
-                timeout=45
-            )
-            if r.status_code == 429:
-                time.sleep(15)
-                continue
-            if r.status_code == 200:
-                raw = r.json()["content"][0]["text"].strip()
-                raw = re5.sub(r'^```(?:json)?\s*', '', raw)
-                raw = re5.sub(r'\s*```$', '', raw)
-                data = json.loads(raw.strip())
-                # Return as dict keyed by chain name
-                return {item["name"]: item for item in data.get("chains", [])}
-            return {}
-        except Exception as e:
-            if attempt == 2: return {}
-            time.sleep(10)
+    result = call_anthropic(prompt, anthropic_key, max_tokens=2000)
+    if result and "chains" in result:
+        return {item["name"]: item for item in result.get("chains", [])}
     return {}
-    """Compare content quality across chains and give Mantle actionable lessons"""
-    if not anthropic_key: return None
-    chains_data = dict(chains_data_tuple)
-
-    chain_summaries = []
-    for name, data in chains_data.items():
-        tweets = data.get("tweets", [])[:15]
-        top = sorted(tweets, key=lambda t: (t.get("public_metrics",{}).get("impression_count") or 0) or
-                     ((t.get("public_metrics",{}).get("like_count",0) or 0)*100), reverse=True)[:5]
-        samples = "\n".join([f"- [{t.get('narrative','?')}] {t.get('text','')[:120]} (views:{fmt(t.get('public_metrics',{}).get('impression_count') or 0)})" for t in top])
-        followers = data.get("followers", 0)
-        total_views = data.get("total_views", 0)
-        chain_summaries.append(f"=={name}== ({followers:,} followers, {total_views:,} total views)\nTop posts:\n{samples}")
-
-    prompt = f"""You are a senior crypto social media strategist. Compare content performance across these chains:
-
-{chr(10).join(chain_summaries)}
-
-Provide analysis in this exact JSON (keep each string under 120 words):
-{{"winner":"chain name with best content quality","winner_reason":"why they win — specific content strategies, narrative alignment, format choices",
-"ranking":[{{"chain":"name","score":"Excellent/Good/Average/Weak","summary":"2-3 sentences on their content approach and what works"}}],
-"market_momentum_leader":"which chain best captures current market narratives and why",
-"mantle_lessons":[{{"from_chain":"chain name","lesson":"specific actionable thing Mantle should copy or adapt","example":"concrete example from their posts"}}]}}
-
-Be specific, reference actual post content. JSON only."""
-
-    import time, json, re as re2
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
-                      "messages": [{"role": "user", "content": prompt}]},
-                timeout=40
-            )
-            if r.status_code == 429:
-                time.sleep(15)
-                continue
-            if r.status_code == 200:
-                raw = r.json()["content"][0]["text"].strip()
-                raw = re2.sub(r'^```(?:json)?\s*', '', raw)
-                raw = re2.sub(r'\s*```$', '', raw)
-                return json.loads(raw.strip())
-            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
-        except Exception as e:
-            if attempt == 2:
-                return {"_error": str(e)}
-            time.sleep(10)
-    return {"_error": "Rate limit — please wait 1 min and refresh"}
 
 def render_chain_swot(name, swot, color):
     if not swot: return
     if "_error" in swot:
-        st.error(f"AI Error: {swot['_error']}")
+        st.info("⏳ AI analysis temporarily unavailable")
         return
     style = swot.get("content_style","")
     st.markdown(f"""
@@ -330,7 +252,7 @@ def render_chain_swot(name, swot, color):
 def render_content_comparison(analysis):
     if not analysis: return
     if "_error" in analysis:
-        st.error(f"AI Error: {analysis['_error']}")
+        st.info("⏳ AI analysis temporarily unavailable")
         return
 
     winner = analysis.get("winner","—")
@@ -379,7 +301,7 @@ def render_content_comparison(analysis):
               <div style="font-size:11px;color:{MANTLE_MUTED};line-height:1.5">💡 {lesson.get("example","")}</div>
             </div>""", unsafe_allow_html=True)
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)
 def ai_social_expert_analysis(tweets_tuple, metrics_data, anthropic_key):
     """Claude as social media expert analyzing Mantle's content performance"""
     if not anthropic_key or not tweets_tuple:
@@ -428,37 +350,14 @@ Tone rules:
 Return ONLY this JSON (no markdown, keep each string under 100 words):
 {{"overall_score":"Good or Average or Needs Improvement","overall_assessment":"assessment here","engagement_analysis":"analysis here","content_quality":"quality here","narrative_fit":"fit here","strengths":["s1","s2","s3"],"weaknesses":["w1","w2","w3"],"recommendations":["r1","r2","r3"]}}"""
 
-    import time, json, re as re3
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
-                      "messages": [{"role": "user", "content": prompt}]},
-                timeout=30
-            )
-            if r.status_code == 429:
-                time.sleep(15)
-                continue
-            if r.status_code == 200:
-                raw = r.json()["content"][0]["text"].strip()
-                raw = re3.sub(r'^```(?:json)?\s*', '', raw)
-                raw = re3.sub(r'\s*```$', '', raw)
-                return json.loads(raw.strip())
-            return {"_error": f"HTTP {r.status_code}: {r.text[:300]}"}
-        except Exception as e:
-            if attempt == 2:
-                return {"_error": str(e)}
-            time.sleep(10)
-    return {"_error": "Rate limit — please wait 1 min and refresh"}
+    return call_anthropic(prompt, anthropic_key, max_tokens=1500)
 
 def render_social_expert_analysis(analysis):
     if not analysis:
         st.info("AI analysis unavailable. Check Anthropic API key.")
         return
     if "_error" in analysis:
-        st.error(f"API Error: {analysis['_error']}")
+        st.info("⏳ AI analysis temporarily unavailable")
         return
 
     score = analysis.get("overall_score", "—")
@@ -573,7 +472,7 @@ def detect_nar_keyword(text):
     found = [n for n, kws in NARRATIVES.items() if any(k in tl for k in kws)]
     return found[0] if found else "Other"
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)
 def classify_narratives_batch(texts_tuple, anthropic_key):
     """Use Claude to classify tweets into narratives — free-form labels"""
     if not anthropic_key:
@@ -596,28 +495,9 @@ Respond with ONLY a JSON object. Example:
 {{"1":"RWA","2":"DeFi","3":"Meme","4":"Community","5":"Infrastructure"}}
 No explanation, no markdown, just JSON."""
 
-    try:
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": anthropic_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 800,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=30
-        )
-        if r.status_code == 200:
-            import json
-            raw = r.json()["content"][0]["text"].strip()
-            result = json.loads(raw)
-            return {int(k)-1: v for k,v in result.items()}
-    except:
-        pass
+    result = call_anthropic(prompt, anthropic_key, max_tokens=800)
+    if result:
+        return {int(k)-1: v for k,v in result.items()}
     return {}
 
 def classify_tweets_narratives(tweets, anthropic_key):
@@ -1326,9 +1206,8 @@ def tab_mantle(token):
                     anthropic_key
                 )
                 if not analysis:
-                    st.error(f"API returned None. Key starts with: {anthropic_key[:10] if anthropic_key else 'MISSING'}")
+                    analysis = None
             except Exception as ex:
-                st.error(f"Error: {ex}")
                 analysis = None
         render_social_expert_analysis(analysis)
 
@@ -1779,7 +1658,7 @@ def impact_score(t):
 
     return reach_score + eng_score + kw_score + cred_score
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)
 def ai_market_intelligence(tweets_tuple, anthropic_key):
     """Claude analyzes market-wide intelligence"""
     if not anthropic_key or not tweets_tuple: return None
@@ -1816,29 +1695,7 @@ Respond ONLY with this JSON (keep each string concise, under 80 words):
 
 JSON only, no markdown."""
 
-    import time, json, re as re4
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2000,
-                      "messages": [{"role": "user", "content": prompt}]},
-                timeout=45
-            )
-            if r.status_code == 429:
-                time.sleep(15)
-                continue
-            if r.status_code == 200:
-                raw = r.json()["content"][0]["text"].strip()
-                raw = re4.sub(r'^```(?:json)?\s*', '', raw)
-                raw = re4.sub(r'\s*```$', '', raw)
-                return json.loads(raw.strip())
-            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
-        except Exception as e:
-            if attempt == 2: return {"_error": str(e)}
-            time.sleep(10)
-    return {"_error": "Rate limit — wait 1 min and refresh"}
+    return call_anthropic(prompt, anthropic_key, max_tokens=2000)
 
 def find_best_match_tweet(text_signal, all_tweets, category_filter=None):
     """Find the tweet that best matches an AI-generated signal text"""
@@ -1868,7 +1725,7 @@ def tweet_link(t):
 def render_intel_analysis(analysis, all_tweets):
     if not analysis: return
     if "_error" in analysis:
-        st.error(f"AI Error: {analysis['_error']}")
+        st.info("⏳ AI analysis temporarily unavailable")
         return
 
     # Market Summary
