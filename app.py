@@ -119,32 +119,7 @@ def get_anthropic_key():
     try: return st.secrets["ANTHROPIC_API_KEY"]
     except: return None
 
-@st.cache_data(ttl=1800)
-def ai_content_summary(chain_name, tweets_text_list, anthropic_key):
-    if not anthropic_key or not tweets_text_list: return None
-    sample = list(tweets_text_list)[:20]
-    combined = "\n---\n".join(sample)
-    prompt = f"""Analyze these tweets from {chain_name}'s official account and respond with JSON only:
-{{"main_themes":["theme1","theme2","theme3"],"top_narrative":"narrative name","top_narrative_reason":"1-2 sentences","content_summary":"2-3 sentences","high_attention_topic":"topic","high_attention_reason":"1-2 sentences"}}
-
-TWEETS:
-{combined}"""
-    try:
-        r = requests.post("https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600,
-                  "messages": [{"role": "user", "content": prompt}]}, timeout=30)
-        if r.status_code == 200:
-            import json, re as re2
-            raw = r.json()["content"][0]["text"].strip()
-            raw = re2.sub(r'^```(?:json)?\s*', '', raw)
-            raw = re2.sub(r'\s*```$', '', raw).strip()
-            return json.loads(raw)
-        return {"_error": f"HTTP {r.status_code}"}
-    except Exception as e:
-        return {"_error": str(e)}
-
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)  # 6 hours
 def ai_content_comparison(chains_data_tuple, anthropic_key):
     """Compare content quality across chains and give Mantle actionable lessons"""
     if not anthropic_key: return None
@@ -191,7 +166,7 @@ JSON only (max 15 words per field). IMPORTANT: mantle_lessons must include one e
             time.sleep(10)
     return {"_error": "Rate limit — wait 1 min and refresh"}
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)  # 6 hours
 def ai_chains_swot_batch(chains_data_tuple, anthropic_key):
     """Batch SWOT for all chains in one API call"""
     if not anthropic_key: return {}
@@ -316,7 +291,7 @@ def render_content_comparison(analysis):
               <div style="font-size:11px;color:{MANTLE_MUTED};line-height:1.5">💡 {lesson.get("example","")}</div>
             </div>""", unsafe_allow_html=True)
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)  # 6 hours
 def ai_social_expert_analysis(tweets_tuple, metrics_data, anthropic_key):
     """Claude as social media expert analyzing Mantle's content performance"""
     if not anthropic_key or not tweets_tuple:
@@ -445,7 +420,7 @@ def _record_api_result(key, r=None, exc=None):
         return
     _last_api_errors.pop(key, None)  # success -> clear any stale error for this key
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=21600)  # 6 hours — social tabs still refresh same-day, just not every 10 min
 def get_user(handle, token):
     key = f"GET /users/by/username/{handle}"
     try:
@@ -457,7 +432,7 @@ def get_user(handle, token):
     _record_api_result(key, r=r)
     return r.json().get("data", {}) if r.status_code == 200 else {}
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=21600)  # 6 hours
 def get_tweets(uid, token, start_iso, end_iso, max_results=100):
     key = f"GET /users/{uid}/tweets"
     params = {"max_results": min(max_results, 100), "start_time": start_iso, "end_time": end_iso,
@@ -472,7 +447,7 @@ def get_tweets(uid, token, start_iso, end_iso, max_results=100):
     if r.status_code != 200: return []
     return r.json().get("data", []) or []
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=21600)  # 6 hours
 def search_tweets(query, token, start_iso, end_iso, max_results=50):
     key = f"GET /tweets/search/recent ({query[:40]})"
     params = {"query": query, "max_results": min(max_results, 100),
@@ -544,7 +519,7 @@ def detect_nar_keyword(text):
     found = [n for n, kws in NARRATIVES.items() if any(k in tl for k in kws)]
     return found[0] if found else "Other"
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=21600)  # 6 hours
 def classify_narratives_batch(texts_tuple, anthropic_key):
     """Use Claude to classify tweets into narratives — free-form labels"""
     if not anthropic_key:
