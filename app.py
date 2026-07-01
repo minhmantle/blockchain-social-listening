@@ -1609,7 +1609,8 @@ IMPACT_KW = [
     "alliance","collaboration","strategic","invest","fund","backed",
 ]
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=43200)  # 12 hours — this tab alone fires 24 accounts x 2 calls = 48 X API
+                           # requests per cache miss, so we cache it much longer than other tabs.
 def fetch_intel_tweets(token, start_iso, end_iso):
     """Fetch tweets from all intelligence accounts"""
     all_tweets = []
@@ -1649,7 +1650,8 @@ def impact_score(t):
 
     return reach_score + eng_score + kw_score + cred_score
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=43200)  # 12 hours — matches fetch_intel_tweets cache so we don't re-run
+                           # the same Claude analysis on an unchanged tweet set every few hours.
 def ai_market_intelligence(tweets_tuple, anthropic_key):
     """Claude analyzes market-wide intelligence"""
     if not anthropic_key or not tweets_tuple: return None
