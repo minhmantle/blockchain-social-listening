@@ -237,56 +237,6 @@ JSON only."""
             if attempt == 2: return {}
             time.sleep(10)
     return {}
-    """Compare content quality across chains and give Mantle actionable lessons"""
-    if not anthropic_key: return None
-    chains_data = dict(chains_data_tuple)
-
-    chain_summaries = []
-    for name, data in chains_data.items():
-        tweets = data.get("tweets", [])[:15]
-        top = sorted(tweets, key=lambda t: (t.get("public_metrics",{}).get("impression_count") or 0) or
-                     ((t.get("public_metrics",{}).get("like_count",0) or 0)*100), reverse=True)[:5]
-        samples = "\n".join([f"- [{t.get('narrative','?')}] {t.get('text','')[:120]} (views:{fmt(t.get('public_metrics',{}).get('impression_count') or 0)})" for t in top])
-        followers = data.get("followers", 0)
-        total_views = data.get("total_views", 0)
-        chain_summaries.append(f"=={name}== ({followers:,} followers, {total_views:,} total views)\nTop posts:\n{samples}")
-
-    prompt = f"""You are a senior crypto social media strategist. Compare content performance across these chains:
-
-{chr(10).join(chain_summaries)}
-
-Provide analysis in this exact JSON (keep each string under 120 words):
-{{"winner":"chain name with best content quality","winner_reason":"why they win — specific content strategies, narrative alignment, format choices",
-"ranking":[{{"chain":"name","score":"Excellent/Good/Average/Weak","summary":"2-3 sentences on their content approach and what works"}}],
-"market_momentum_leader":"which chain best captures current market narratives and why",
-"mantle_lessons":[{{"from_chain":"chain name","lesson":"specific actionable thing Mantle should copy or adapt","example":"concrete example from their posts"}}]}}
-
-Be specific, reference actual post content. JSON only."""
-
-    import time, json, re as re2
-    for attempt in range(3):
-        try:
-            r = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": anthropic_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
-                      "messages": [{"role": "user", "content": prompt}]},
-                timeout=40
-            )
-            if r.status_code == 429:
-                time.sleep(15)
-                continue
-            if r.status_code == 200:
-                raw = r.json()["content"][0]["text"].strip()
-                raw = re2.sub(r'^```(?:json)?\s*', '', raw)
-                raw = re2.sub(r'\s*```$', '', raw)
-                return json.loads(raw.strip())
-            return {"_error": f"HTTP {r.status_code}: {r.text[:200]}"}
-        except Exception as e:
-            if attempt == 2:
-                return {"_error": str(e)}
-            time.sleep(10)
-    return {"_error": "Rate limit — please wait 1 min and refresh"}
 
 def render_chain_swot(name, swot, color):
     if not swot: return
@@ -432,7 +382,7 @@ Return ONLY this JSON (no markdown, keep each string under 100 words):
 
 def render_social_expert_analysis(analysis):
     if not analysis:
-        st.info("AI analysis unavailable. Check Anthropic API key.")
+        st.info("AI analysis unavailable — see the message above for the specific reason.")
         return
     if "_error" in analysis:
         st.error(f"API Error: {analysis['_error']}")
@@ -481,28 +431,60 @@ def get_token():
 
 def hdrs(t): return {"Authorization": f"Bearer {t}"}
 
+# Module-level store of the most recent X API errors, keyed by endpoint.
+# This lets the UI show the REAL reason a fetch came back empty (rate limit,
+# bad/expired token, wrong plan, etc.) instead of silently showing 0s.
+_last_api_errors = {}
+
+def _record_api_result(key, r=None, exc=None):
+    if exc is not None:
+        _last_api_errors[key] = f"Request failed: {exc}"
+        return
+    if r is not None and r.status_code != 200:
+        _last_api_errors[key] = f"HTTP {r.status_code}: {r.text[:300]}"
+        return
+    _last_api_errors.pop(key, None)  # success -> clear any stale error for this key
+
 @st.cache_data(ttl=600)
 def get_user(handle, token):
-    r = requests.get(f"https://api.twitter.com/2/users/by/username/{handle}",
-        headers=hdrs(token), params={"user.fields": "public_metrics,description"})
+    key = f"GET /users/by/username/{handle}"
+    try:
+        r = requests.get(f"https://api.twitter.com/2/users/by/username/{handle}",
+            headers=hdrs(token), params={"user.fields": "public_metrics,description"}, timeout=15)
+    except Exception as e:
+        _record_api_result(key, exc=e)
+        return {}
+    _record_api_result(key, r=r)
     return r.json().get("data", {}) if r.status_code == 200 else {}
 
 @st.cache_data(ttl=600)
 def get_tweets(uid, token, start_iso, end_iso, max_results=100):
+    key = f"GET /users/{uid}/tweets"
     params = {"max_results": min(max_results, 100), "start_time": start_iso, "end_time": end_iso,
               "tweet.fields": "public_metrics,created_at,text",
               "exclude": "retweets,replies"}
-    r = requests.get(f"https://api.twitter.com/2/users/{uid}/tweets", headers=hdrs(token), params=params)
+    try:
+        r = requests.get(f"https://api.twitter.com/2/users/{uid}/tweets", headers=hdrs(token), params=params, timeout=15)
+    except Exception as e:
+        _record_api_result(key, exc=e)
+        return []
+    _record_api_result(key, r=r)
     if r.status_code != 200: return []
     return r.json().get("data", []) or []
 
 @st.cache_data(ttl=600)
 def search_tweets(query, token, start_iso, end_iso, max_results=50):
+    key = f"GET /tweets/search/recent ({query[:40]})"
     params = {"query": query, "max_results": min(max_results, 100),
               "start_time": start_iso, "end_time": end_iso,
               "tweet.fields": "public_metrics,created_at,author_id,text",
               "expansions": "author_id", "user.fields": "username,name,public_metrics"}
-    r = requests.get("https://api.twitter.com/2/tweets/search/recent", headers=hdrs(token), params=params)
+    try:
+        r = requests.get("https://api.twitter.com/2/tweets/search/recent", headers=hdrs(token), params=params, timeout=15)
+    except Exception as e:
+        _record_api_result(key, exc=e)
+        return []
+    _record_api_result(key, r=r)
     if r.status_code != 200: return []
     data = r.json()
     tweets = data.get("data", [])
@@ -513,6 +495,18 @@ def search_tweets(query, token, start_iso, end_iso, max_results=50):
         t["author_handle"] = u.get("username", "unknown")
         t["author_followers"] = u.get("public_metrics", {}).get("followers_count", 0)
     return tweets
+
+def show_x_api_errors():
+    """Surface the real X (Twitter) API errors, if any, instead of silently showing 0s."""
+    if _last_api_errors:
+        with st.expander("⚠️ X API request(s) failed — click for details", expanded=True):
+            for endpoint, err in _last_api_errors.items():
+                st.error(f"**{endpoint}**\n\n{err}")
+            st.caption(
+                "Common causes: TWITTER_BEARER_TOKEN expired/invalid, X API free-tier "
+                "rate limit hit (very low quota), or your X API plan doesn't include this endpoint. "
+                "This is unrelated to the Anthropic/Claude API key."
+            )
 
 def fmt(n):
     if not n: return "0"
@@ -1194,6 +1188,8 @@ def tab_mantle(token):
         tweets = get_tweets(uid, token, start_iso, end_iso) if uid else []
         prev_tw = get_tweets(uid, token, prev_s_iso, prev_e_iso) if uid else []
 
+    show_x_api_errors()
+
     # Classify narratives with Claude
     anthropic_key = get_anthropic_key()
     if tweets:
@@ -1302,7 +1298,10 @@ def tab_mantle(token):
                     anthropic_key
                 )
                 if not analysis:
-                    st.error(f"API returned None. Key starts with: {anthropic_key[:10] if anthropic_key else 'MISSING'}")
+                    if not tweets:
+                        st.warning("No AI analysis: no tweets were fetched for this period (see X API errors above, if any).")
+                    else:
+                        st.error("AI analysis returned nothing. This means the Anthropic API call itself failed silently — check your ANTHROPIC_API_KEY.")
             except Exception as ex:
                 st.error(f"Error: {ex}")
                 analysis = None
@@ -1366,6 +1365,8 @@ def tab_competitive(token):
             tw = get_tweets(uid, token, start_iso, end_iso) if uid else []
             ptw = get_tweets(uid, token, prev_s_iso, prev_e_iso) if uid else []
             all_data[name] = {"user":u, "tweets":tw, "prev":ptw, "color":color, "handle":handle}
+
+    show_x_api_errors()
 
     # Classify narratives for all chains
     with st.spinner("Classifying narratives with AI…"):
@@ -1612,6 +1613,8 @@ def tab_research(token):
                 t["author_name"] = u.get("name", handle)
                 t["author_followers"] = u.get("public_metrics",{}).get("followers_count", 0)
             all_posts.extend(tw)
+
+    show_x_api_errors()
 
     filtered = [p for p in all_posts if any(k in p.get("text","").lower() for k in RESEARCH_KW)]
 
@@ -1955,10 +1958,12 @@ def tab_intel(token):
     with st.spinner(f"Fetching data from {total_accounts} accounts across Research, Chains & Institutional…"):
         all_tweets = fetch_intel_tweets(token, start_iso, end_iso)
 
+    show_x_api_errors()
+
     st.caption(f"Fetched {len(all_tweets)} posts from {total_accounts} accounts · {start} → {end}")
 
     if not all_tweets:
-        st.warning("No data found. Check API token.")
+        st.warning("No data found. Check the errors above (if any) or your TWITTER_BEARER_TOKEN.")
         return
 
     # Classify narratives
